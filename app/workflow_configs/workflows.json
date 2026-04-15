@@ -1,0 +1,70 @@
+{
+  "workflows": {
+    "private_lending_v1": {
+      "code": "private_lending_v1",
+      "start_step": "location",
+      "steps": {
+        "location": {
+          "title": "Location",
+          "activity": "save_location_step",
+          "next": "financial",
+          "fields": [
+            { "name": "polygon_wkt", "type": "textarea", "required": true },
+            { "name": "country", "type": "text", "required": false },
+            { "name": "region", "type": "text", "required": false },
+            { "name": "notes", "type": "textarea", "required": false }
+          ]
+        },
+        "financial": {
+          "title": "Financial",
+          "activity": "save_financial_step",
+          "next": "identifiers",
+          "fields": [
+            { "name": "loan_amount", "type": "number", "required": true },
+            { "name": "currency", "type": "text", "required": true, "default": "EUR" },
+            { "name": "use_of_proceeds_id", "type": "select", "required": true },
+            { "name": "nature_positive_percentage", "type": "number", "required": true },
+            { "name": "notes", "type": "textarea", "required": false }
+          ]
+        },
+        "identifiers": {
+          "title": "Identifiers",
+          "activity": "save_identifiers_step",
+          "next": null,
+          "fields": [
+            { "name": "organic_farmer_number", "type": "text", "required": false },
+            { "name": "environment_scheme_number", "type": "text", "required": false },
+            { "name": "subsidy_reference", "type": "text", "required": false },
+            { "name": "registry_notes", "type": "textarea", "required": false }
+          ]
+        }
+      }
+    },
+    "private_lending_with_document_v1": {
+      "code": "private_lending_with_document_v1",
+      "start_step": "location",
+      "steps": {
+        "location": {
+          "title": "Location",
+          "activity": "save_location_step",
+          "next": "supporting_document",
+          "fields": [
+            { "name": "polygon_wkt", "type": "textarea", "required": true },
+            { "name": "country", "type": "text", "required": false },
+            { "name": "region", "type": "text", "required": false },
+            { "name": "notes", "type": "textarea", "required": false }
+          ]
+        },
+        "supporting_document": {
+          "title": "Supporting document",
+          "activity": "save_supporting_document_step",
+          "next": null,
+          "fields": [
+            { "name": "supporting_document", "type": "file", "required": true },
+            { "name": "document_notes", "type": "textarea", "required": false }
+          ]
+        }
+      }
+    }
+  }
+}

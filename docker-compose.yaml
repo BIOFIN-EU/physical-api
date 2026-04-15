@@ -1,0 +1,109 @@
+services:
+  physical-api:
+    image: physical-api:1.0.0
+    build: .
+    networks:
+      - biofin_network
+    volumes:
+      - .:/usr/src/application
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8020:8000"
+    env_file:
+      - .env.dev
+    depends_on:
+      - temporal
+    restart: unless-stopped
+
+  physical-db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    ports:
+      - "5434:5432"
+    volumes:
+      - physical_data:/var/lib/postgresql/data
+    networks:
+      - biofin_network
+
+  physical-worker:
+    image: physical-api:1.0.0
+    build: .
+    networks:
+      - biofin_network
+    volumes:
+      - .:/usr/src/application
+    command: python -m app.workers.temporal_worker
+    env_file:
+      - .env.dev
+    depends_on:
+      - temporal
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    networks:
+      - biofin_network
+    ports:
+      - "7233:7233"
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+    depends_on:
+      - temporal-postgres
+    restart: unless-stopped
+
+  temporal-postgres:
+    image: postgres:16
+    networks:
+      - biofin_network
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    restart: unless-stopped
+    volumes:
+      - temporal_pg_data:/var/lib/postgresql/data
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    networks:
+      - biofin_network
+    ports:
+      - "8080:8080"
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TASK_QUEUE: case-workflow-task-queue
+    depends_on:
+      - temporal
+
+  minio:
+    image: minio/minio:latest
+    container_name: physical-minio
+    command: server /data --console-address ":9001"
+    env_file:
+      - .env.dev
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - biofin_network
+
+volumes:
+  physical_data:
+  temporal_pg_data:
+  minio_data:
+
+
+networks:
+  biofin_network:
+    external: true
