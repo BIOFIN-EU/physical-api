@@ -8,6 +8,8 @@
           "title": "Location",
           "activity": "save_location_step",
           "next": "financial",
+          "ui_mode": "map_form",
+          "submit_mode": "json",
           "fields": [
             { "name": "polygon_wkt", "type": "textarea", "required": true },
             { "name": "country", "type": "text", "required": false },
@@ -19,6 +21,8 @@
           "title": "Financial",
           "activity": "save_financial_step",
           "next": "identifiers",
+          "ui_mode": "form",
+          "submit_mode": "json",
           "fields": [
             { "name": "loan_amount", "type": "number", "required": true },
             { "name": "currency", "type": "text", "required": true, "default": "EUR" },
@@ -59,6 +63,8 @@
           "title": "Supporting document",
           "activity": "save_supporting_document_step",
           "next": null,
+          "ui_mode": "file_form",
+          "submit_mode": "multipart",
           "fields": [
             { "name": "supporting_document", "type": "file", "required": true },
             { "name": "document_notes", "type": "textarea", "required": false }
