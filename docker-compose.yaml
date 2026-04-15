@@ -1,21 +1,24 @@
 services:
   physical-api:
+    container_name: physical-api
     image: physical-api:1.0.0
     build: .
-    networks:
-      - biofin_network
     volumes:
       - .:/usr/src/application
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8020 --reload
     ports:
-      - "8020:8000"
+      - "8020:8020"
     env_file:
       - .env.dev
     depends_on:
       - temporal
     restart: unless-stopped
+    networks:
+      - biofin_network
+
 
   physical-db:
+    container_name: physical-db
     image: postgres:16
     restart: unless-stopped
     env_file:
@@ -27,11 +30,11 @@ services:
     networks:
       - biofin_network
 
+
   physical-worker:
+    container_name: physical-worker
     image: physical-api:1.0.0
     build: .
-    networks:
-      - biofin_network
     volumes:
       - .:/usr/src/application
     command: python -m app.workers.temporal_worker
@@ -40,11 +43,13 @@ services:
     depends_on:
       - temporal
     restart: unless-stopped
-
-  temporal:
-    image: temporalio/auto-setup:latest
     networks:
       - biofin_network
+
+
+  temporal:
+    container_name: temporal
+    image: temporalio/auto-setup:latest
     ports:
       - "7233:7233"
     environment:
@@ -53,14 +58,18 @@ services:
       POSTGRES_USER: temporal
       POSTGRES_PWD: temporal
       POSTGRES_SEEDS: temporal-postgres
+      TEMPORAL_LOG_LEVEL: warn
+    networks:
+      - biofin_network
+
+
     depends_on:
       - temporal-postgres
     restart: unless-stopped
 
   temporal-postgres:
+    container_name: temporal-postgres
     image: postgres:16
-    networks:
-      - biofin_network
     environment:
       POSTGRES_DB: temporal
       POSTGRES_USER: temporal
@@ -68,11 +77,13 @@ services:
     restart: unless-stopped
     volumes:
       - temporal_pg_data:/var/lib/postgresql/data
-
-  temporal-ui:
-    image: temporalio/ui:latest
     networks:
       - biofin_network
+
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:latest
     ports:
       - "8080:8080"
     environment:
@@ -80,10 +91,13 @@ services:
       TEMPORAL_TASK_QUEUE: case-workflow-task-queue
     depends_on:
       - temporal
+    networks:
+      - biofin_network
+
 
   minio:
+    container_name: minio
     image: minio/minio:latest
-    container_name: physical-minio
     command: server /data --console-address ":9001"
     env_file:
       - .env.dev
@@ -102,7 +116,6 @@ volumes:
   physical_data:
   temporal_pg_data:
   minio_data:
-
 
 networks:
   biofin_network:
