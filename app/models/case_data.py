@@ -1,8 +1,9 @@
 from __future__ import annotations
-
+from uuid import UUID
 from datetime import datetime
 from typing import Optional
 from decimal import Decimal
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -30,11 +31,12 @@ class Case(Base):
 
     case_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "nature_financing"
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
-    created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    updated_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

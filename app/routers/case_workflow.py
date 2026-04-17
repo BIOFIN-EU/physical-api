@@ -1,7 +1,5 @@
 import asyncio
 import logging
-
-
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
@@ -12,6 +10,7 @@ from app.core.settings import settings
 from app.services.workflow_runtime_service import WorkflowRuntimeService
 from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.file_storage_service import store_upload
+from app.dependencies.gateway_identity import get_request_user_id
 from sqlalchemy import select
 
 from app.models.case_data import CaseDocument
@@ -55,12 +54,15 @@ def _validate_fields(step_config: dict, payload: dict) -> dict:
 async def start_case(
         workflow_code: str,
         db: AsyncSession = Depends(get_db),
+        user_id: str = Depends(get_request_user_id)
+
 ) -> dict:
     service = WorkflowRuntimeService(db)
 
     try:
         workflow_id = await service.start_workflow(
             workflow_code=workflow_code,
+            user_id=str(user_id),
         )
     except WorkflowNotFoundError:
         raise HTTPException(

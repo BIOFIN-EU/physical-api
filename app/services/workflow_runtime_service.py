@@ -9,7 +9,7 @@ from app.models.case_data import Case
 from app.models.workflow import WorkflowDefinition, CaseWorkflowRun
 from app.schemas.workflow_runtime import WorkflowRuntimeInput
 from app.services.workflow_config_service import WorkflowConfigService
-
+from uuid import UUID
 
 class WorkflowRuntimeService:
     def __init__(self, db: AsyncSession):
@@ -18,8 +18,8 @@ class WorkflowRuntimeService:
     async def start_workflow(
         self,
         workflow_code: str,
+        user_id: UUID,
         case_type: str = "nature_financing",
-        created_by: str | None = None,
     ) -> str:
         config_service = WorkflowConfigService()
         workflow_config = config_service.get_workflow(workflow_code)
@@ -27,7 +27,8 @@ class WorkflowRuntimeService:
         case = Case(
             case_type=case_type,
             status="draft",
-            created_by=created_by,
+            created_by=user_id,
+            updated_by=user_id
         )
         self.db.add(case)
         await self.db.flush()
