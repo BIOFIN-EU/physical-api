@@ -29,7 +29,7 @@ class Case(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    case_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "nature_financing"
+    case_type: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     created_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
 

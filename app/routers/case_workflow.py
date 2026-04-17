@@ -13,7 +13,7 @@ from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.file_storage_service import store_upload
 from app.dependencies.gateway_identity import get_request_user_id
 from sqlalchemy import select
-from app.services.case_state import build_case_payload
+from app.services.case_state import build_case_payload, get_case_workflow_config
 from app.models.case_data import CaseDocument
 from app.services.object_storage_service import get_presigned_download_url
 
@@ -301,6 +301,13 @@ async def get_case_data(
     payload = await build_case_payload(db=db, case_id=case_id)
 
     if payload is None:
-        raise HTTPException(status_code=404, detail="Case not found")
+        raise HTTPException(status_code=404, detail="Case payload not found")
+
+    workflow_config = await get_case_workflow_config(db=db, case_id=case_id)
+
+    if workflow_config is None:
+        raise HTTPException(status_code=404, detail="Case Workflow Config not found")
+
+    payload["workflow_config"] = workflow_config
 
     return payload

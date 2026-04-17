@@ -11,21 +11,21 @@ from app.schemas.workflow_runtime import WorkflowRuntimeInput
 from app.services.workflow_config_service import WorkflowConfigService
 from uuid import UUID
 
+
 class WorkflowRuntimeService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
     async def start_workflow(
-        self,
-        workflow_code: str,
-        user_id: UUID,
-        case_type: str = "nature_financing",
+            self,
+            workflow_code: str,
+            user_id: UUID
     ) -> str:
         config_service = WorkflowConfigService()
         workflow_config = config_service.get_workflow(workflow_code)
 
         case = Case(
-            case_type=case_type,
+            case_type=workflow_code,
             status="draft",
             created_by=user_id,
             updated_by=user_id
@@ -33,7 +33,7 @@ class WorkflowRuntimeService:
         self.db.add(case)
         await self.db.flush()
 
-        case_pk = case.id  # if your Case model still uses case_id, change this to case.case_id
+        case_pk = case.id
 
         workflow_definition = await self.db.scalar(
             select(WorkflowDefinition).where(

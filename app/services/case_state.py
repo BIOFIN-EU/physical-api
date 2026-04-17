@@ -8,7 +8,7 @@ from typing import Any, Callable
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
+from app.services.workflow_config_service import WorkflowConfigService
 from app.models.case_data import (
     Case,
     CaseLocation,
@@ -156,7 +156,7 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
     ),
 }
 
-
+#todo check if can be integrated into main db call
 async def fetch_section(
     db: AsyncSession,
     *,
@@ -226,3 +226,19 @@ async def build_case_payload(
             )
 
     return payload
+
+
+async def get_case_workflow_config(
+    db: AsyncSession,
+    case_id: int,
+) -> dict[str, Any] | None:
+    config_service = WorkflowConfigService()
+
+    workflow_code = await db.scalar(
+        select(Case.case_type).where(Case.id == case_id)
+    )
+
+    if workflow_code is None:
+        return None
+
+    return config_service.get_workflow(workflow_code)
