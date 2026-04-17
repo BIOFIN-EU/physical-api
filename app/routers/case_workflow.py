@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,9 @@ from sqlalchemy import select
 
 from app.models.case_data import CaseDocument
 from app.services.object_storage_service import get_presigned_download_url
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter()
 
@@ -105,12 +110,15 @@ async def get_case_state(
 
 @router.post("/cases/{case_id}/submit-json")
 async def submit_step(case_id: int, payload: dict) -> dict:
+    logging.info("Received payload for case %s: %s", case_id, payload)
+
     client = await Client.connect(settings.TEMPORAL_ADDRESS)
     handle = client.get_workflow_handle(f"case-{case_id}")
 
     before_state = await handle.query("get_state")
     current_step = before_state.get("current_step")
     step_config = before_state.get("step", {})
+    before_status = before_state.get("status")
 
     if not current_step:
         raise HTTPException(status_code=400, detail="No current step available")
@@ -128,20 +136,37 @@ async def submit_step(case_id: int, payload: dict) -> dict:
 
     await handle.signal("submit_step", payload)
 
-    for _ in range(10):
+    for _ in range(15):
         await asyncio.sleep(0.2)
         state = await handle.query("get_state")
 
-        if state.get("current_step") != current_step or state.get("validation_errors"):
+        validation_errors = state.get("validation_errors") or {}
+        new_step = state.get("current_step")
+        new_status = state.get("status")
+
+        if validation_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Validation failed",
+                    "current_step": new_step,
+                    "field_errors": validation_errors,
+                },
+            )
+
+        if new_step != current_step or new_status != before_status:
             return {
                 "message": "Step submitted successfully",
                 "state": state,
             }
 
-    return {
-        "message": "Step submitted",
-        "state": await handle.query("get_state"),
-    }
+    raise HTTPException(
+        status_code=202,
+        detail={
+            "message": "Submission accepted and is still processing",
+            "state": await handle.query("get_state"),
+        },
+    )
 
 
 @router.post("/cases/{case_id}/submit-file")

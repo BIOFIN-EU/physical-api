@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-
+from decimal import Decimal
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -15,7 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
 from app.core.settings import settings
 
@@ -26,7 +26,7 @@ class Case(Base):
     __tablename__ = "cases"
     __table_args__ = {"schema": CASE_DATA_SCHEMA}
 
-    case_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "nature_financing"
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
@@ -51,11 +51,11 @@ class CaseLocation(Base):
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    case_location_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Cross-schema link to workflow case
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 
@@ -87,22 +87,25 @@ class CaseFinancial(Base):
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    case_financial_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    loan_amount: Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    loan_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
+
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
 
     use_of_proceeds_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.use_of_proceeds_types.use_of_proceeds_type_id"), nullable=False
+        ForeignKey(f"{CASE_DATA_SCHEMA}.use_of_proceeds.id"),
+        nullable=False,
     )
+    use_of_proceeds: Mapped["UseOfProceeds"] = relationship()
 
     # % of financing that supports nature-positive action
-    nature_positive_percentage: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    nature_positive_percentage: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
 
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -123,10 +126,10 @@ class CaseIdentifiers(Base):
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    case_identifiers_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 
@@ -151,17 +154,18 @@ class Operator(Base):
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    operator_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     operator_specialty_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.operator_specialties.operator_specialty_id"), nullable=False
+        ForeignKey(f"{CASE_DATA_SCHEMA}.operator_specialties.id"), nullable=False
     )
+    operator_specialty: Mapped["OperatorSpecialty"] = relationship()
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -176,18 +180,16 @@ class Operator(Base):
 # Use of proceeds lookup
 # ---------------------------------------------------------
 
-class UseOfProceedsType(Base):
-    __tablename__ = "use_of_proceeds_types"
+class UseOfProceeds(Base):
+    __tablename__ = "use_of_proceeds"
     __table_args__ = {"schema": CASE_DATA_SCHEMA}
 
-    use_of_proceeds_type_id: Mapped[int] = mapped_column(
+    id: Mapped[int] = mapped_column(
         SmallInteger, primary_key=True, autoincrement=True
     )
 
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -199,7 +201,7 @@ class OperatorSpecialty(Base):
     __tablename__ = "operator_specialties"
     __table_args__ = {"schema": CASE_DATA_SCHEMA}
 
-    operator_specialty_id: Mapped[int] = mapped_column(
+    id: Mapped[int] = mapped_column(
         SmallInteger, primary_key=True, autoincrement=True
     )
 
@@ -208,6 +210,7 @@ class OperatorSpecialty(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
 
 # ---------------------------------------------------------
 # Documents
@@ -220,10 +223,10 @@ class CaseDocument(Base):
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    case_document_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 

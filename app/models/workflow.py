@@ -42,7 +42,7 @@ class CaseWorkflowRun(Base):
     case_workflow_run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.case_id", ondelete="CASCADE"),
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
     workflow_definition_id: Mapped[int] = mapped_column(

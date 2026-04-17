@@ -19,24 +19,24 @@ class ORMBaseSchema(BaseModel):
 # Lookup tables
 # ---------------------------------------------------------
 
-class UseOfProceedsTypeBase(BaseModel):
+class UseOfProceedsBase(BaseModel):
     code: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
 
 
-class UseOfProceedsTypeCreate(UseOfProceedsTypeBase):
+class UseOfProceedsCreate(UseOfProceedsBase):
     pass
 
 
-class UseOfProceedsTypeUpdate(BaseModel):
+class UseOfProceedsUpdate(BaseModel):
     code: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
 
 
-class UseOfProceedsTypeRead(ORMBaseSchema):
-    use_of_proceeds_type_id: int
+class UseOfProceedsRead(ORMBaseSchema):
+    id: int
     code: str
     name: str
     description: Optional[str] = None
@@ -59,7 +59,7 @@ class OperatorSpecialtyUpdate(BaseModel):
 
 
 class OperatorSpecialtyRead(ORMBaseSchema):
-    operator_specialty_id: int
+    id: int
     code: str
     name: str
     description: Optional[str] = None
@@ -89,7 +89,7 @@ class CaseLocationUpdate(BaseModel):
 
 
 class CaseLocationRead(ORMBaseSchema):
-    case_location_id: int
+    id: int
     case_id: int
     polygon_wkt: str
     country: Optional[str] = None
@@ -125,11 +125,12 @@ class CaseFinancialUpdate(BaseModel):
 
 
 class CaseFinancialRead(ORMBaseSchema):
-    case_financial_id: int
+    id: int
     case_id: int
     loan_amount: Optional[Decimal] = None
     currency: str
     use_of_proceeds_id: int
+    use_of_proceeds_name: Optional[str] = None
     nature_positive_percentage: Optional[Decimal] = None
     notes: Optional[str] = None
     created_at: datetime
@@ -140,7 +141,7 @@ class CaseFinancialRead(ORMBaseSchema):
 # CaseRegistration
 # ---------------------------------------------------------
 
-class CaseRegistrationBase(BaseModel):
+class CaseIdentifiersBase(BaseModel):
     case_id: int
     organic_farmer_number: Optional[str] = Field(None, max_length=100)
     environment_scheme_number: Optional[str] = Field(None, max_length=100)
@@ -148,19 +149,19 @@ class CaseRegistrationBase(BaseModel):
     registry_notes: Optional[str] = None
 
 
-class CaseRegistrationCreate(CaseRegistrationBase):
+class CaseIdentifiersCreate(CaseIdentifiersBase):
     pass
 
 
-class CaseRegistrationUpdate(BaseModel):
+class CaseIdentifiersUpdate(BaseModel):
     organic_farmer_number: Optional[str] = Field(None, max_length=100)
     environment_scheme_number: Optional[str] = Field(None, max_length=100)
     subsidy_reference: Optional[str] = Field(None, max_length=100)
     registry_notes: Optional[str] = None
 
 
-class CaseRegistrationRead(ORMBaseSchema):
-    case_registration_id: int
+class CaseIdentifiersRead(ORMBaseSchema):
+    id: int
     case_id: int
     organic_farmer_number: Optional[str] = None
     environment_scheme_number: Optional[str] = None
@@ -196,10 +197,11 @@ class OperatorUpdate(BaseModel):
 
 
 class OperatorRead(ORMBaseSchema):
-    operator_id: int
+    id: int
     case_id: int
     name: str
     operator_specialty_id: int
+    operator_specialty_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     notes: Optional[str] = None

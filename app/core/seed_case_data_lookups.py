@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case_data import (
-    UseOfProceedsType,
+    UseOfProceeds,
     OperatorSpecialty,
 )
 
@@ -47,7 +47,7 @@ async def seed_use_of_proceeds_types(db: AsyncSession):
     ]
 
     for code, name, description in values:
-        await _upsert_by_code(db, UseOfProceedsType, code, name, description)
+        await _upsert_by_code(db, UseOfProceeds, code, name, description)
 
 
 # ---------------------------------------------------------

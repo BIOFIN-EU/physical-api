@@ -11,10 +11,30 @@
           "ui_mode": "map_form",
           "submit_mode": "json",
           "fields": [
-            { "name": "polygon_wkt", "type": "textarea", "required": true },
-            { "name": "country", "type": "text", "required": false },
-            { "name": "region", "type": "text", "required": false },
-            { "name": "notes", "type": "textarea", "required": false }
+            {
+              "name": "polygon_wkt",
+              "display_name": "Polygon WKT",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "country",
+              "display_name": "Country",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "region",
+              "display_name": "Region",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "notes",
+              "display_name": "Notes",
+              "type": "textarea",
+              "required": false
+            }
           ]
         },
         "financial": {
@@ -24,11 +44,38 @@
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
-            { "name": "loan_amount", "type": "number", "required": true },
-            { "name": "currency", "type": "text", "required": true, "default": "EUR" },
-            { "name": "use_of_proceeds_id", "type": "select", "required": true },
-            { "name": "nature_positive_percentage", "type": "number", "required": true },
-            { "name": "notes", "type": "textarea", "required": false }
+            {
+              "name": "loan_amount",
+              "display_name": "Loan Amount",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "currency",
+              "display_name": "Currency",
+              "type": "text",
+              "required": true,
+              "default": "EUR"
+            },
+            {
+              "name": "use_of_proceeds_id",
+              "display_name": "Use of Proceeds",
+              "type": "select",
+              "required": true,
+              "options_source": "use_of_proceeds"
+            },
+            {
+              "name": "nature_positive_percentage",
+              "display_name": "Nature Positive Percentage",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "notes",
+              "display_name": "Notes",
+              "type": "textarea",
+              "required": false
+            }
           ]
         },
         "identifiers": {
@@ -36,10 +83,30 @@
           "activity": "save_identifiers_step",
           "next": null,
           "fields": [
-            { "name": "organic_farmer_number", "type": "text", "required": false },
-            { "name": "environment_scheme_number", "type": "text", "required": false },
-            { "name": "subsidy_reference", "type": "text", "required": false },
-            { "name": "registry_notes", "type": "textarea", "required": false }
+            {
+              "name": "organic_farmer_number",
+              "display_name": "Organic Farmer Number",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "environment_scheme_number",
+              "display_name": "Environment Scheme Number",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "subsidy_reference",
+              "display_name": "Subsidy Reference",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "registry_notes",
+              "display_name": "Registry Notes",
+              "type": "textarea",
+              "required": false
+            }
           ]
         }
       }
@@ -53,10 +120,30 @@
           "activity": "save_location_step",
           "next": "supporting_document",
           "fields": [
-            { "name": "polygon_wkt", "type": "textarea", "required": true },
-            { "name": "country", "type": "text", "required": false },
-            { "name": "region", "type": "text", "required": false },
-            { "name": "notes", "type": "textarea", "required": false }
+            {
+              "name": "polygon_wkt",
+              "display_name": "Polygon WKT",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "country",
+              "display_name": "Country",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "region",
+              "display_name": "Region",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "notes",
+              "display_name": "Notes",
+              "type": "textarea",
+              "required": false
+            }
           ]
         },
         "supporting_document": {
@@ -66,8 +153,18 @@
           "ui_mode": "file_form",
           "submit_mode": "multipart",
           "fields": [
-            { "name": "supporting_document", "type": "file", "required": true },
-            { "name": "document_notes", "type": "textarea", "required": false }
+            {
+              "name": "supporting_document",
+              "display_name": "Supporting Document",
+              "type": "file",
+              "required": true
+            },
+            {
+              "name": "document_notes",
+              "display_name": "Document Notes",
+              "type": "textarea",
+              "required": false
+            }
           ]
         }
       }

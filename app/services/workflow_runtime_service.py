@@ -1,4 +1,5 @@
 from temporalio.client import Client
+from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,6 @@ class WorkflowRuntimeService:
         config_service = WorkflowConfigService()
         workflow_config = config_service.get_workflow(workflow_code)
 
-        # 1. Create the business case first
         case = Case(
             case_type=case_type,
             status="draft",
@@ -32,7 +32,8 @@ class WorkflowRuntimeService:
         self.db.add(case)
         await self.db.flush()
 
-        # 2. Find or create workflow definition
+        case_pk = case.id  # if your Case model still uses case_id, change this to case.case_id
+
         workflow_definition = await self.db.scalar(
             select(WorkflowDefinition).where(
                 WorkflowDefinition.code == workflow_code,
@@ -50,32 +51,47 @@ class WorkflowRuntimeService:
             self.db.add(workflow_definition)
             await self.db.flush()
 
-        # 3. Start Temporal workflow
         client = await Client.connect(settings.TEMPORAL_ADDRESS)
 
-        temporal_workflow_id = f"case-{case.case_id}"
+        temporal_workflow_id = f"case-{case_pk}"
 
         runtime_input = WorkflowRuntimeInput(
-            case_id=case.case_id,
+            case_id=case_pk,
             workflow_code=workflow_code,
             workflow_config=workflow_config,
         )
 
-        handle = await client.start_workflow(
-            "ConfigDrivenCaseWorkflow",
-            runtime_input,
-            id=temporal_workflow_id,
-            task_queue=settings.TEMPORAL_TASK_QUEUE,
-        )
+        try:
+            handle = await client.start_workflow(
+                "ConfigDrivenCaseWorkflow",
+                runtime_input,
+                id=temporal_workflow_id,
+                task_queue=settings.TEMPORAL_TASK_QUEUE,
+            )
+            temporal_run_id = handle.result_run_id
+            workflow_status = "running"
 
-        # 4. Store workflow run metadata
+        except WorkflowAlreadyStartedError:
+            existing_run = await self.db.scalar(
+                select(CaseWorkflowRun).where(
+                    CaseWorkflowRun.temporal_workflow_id == temporal_workflow_id
+                )
+            )
+
+            if existing_run is not None:
+                await self.db.commit()
+                return existing_run.temporal_workflow_id
+
+            await self.db.rollback()
+            raise
+
         run = CaseWorkflowRun(
-            case_id=case.case_id,
+            case_id=case_pk,
             workflow_definition_id=workflow_definition.workflow_definition_id,
             temporal_workflow_id=temporal_workflow_id,
-            temporal_run_id=handle.result_run_id,
+            temporal_run_id=temporal_run_id,
             current_step=workflow_config["start_step"],
-            status="running",
+            status=workflow_status,
         )
         self.db.add(run)
 

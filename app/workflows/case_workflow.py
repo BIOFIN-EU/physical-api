@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.exceptions import ActivityError, ApplicationError
 
 from app.schemas.workflow_runtime import WorkflowRuntimeInput
 
@@ -16,6 +17,7 @@ with workflow.unsafe.imports_passed_through():
         save_supporting_document_step,
         update_run_state,
     )
+
 
 @workflow.defn
 class ConfigDrivenCaseWorkflow:
@@ -70,11 +72,20 @@ class ConfigDrivenCaseWorkflow:
             activity_name = step_config["activity"]
             activity_fn = self._get_activity_fn(activity_name)
 
-            await workflow.execute_activity(
-                activity_fn,
-                args=[self.case_id, payload],
-                start_to_close_timeout=timedelta(seconds=30),
-            )
+            try:
+                await workflow.execute_activity(
+                    activity_fn,
+                    args=[self.case_id, payload],
+                    start_to_close_timeout=timedelta(seconds=30),
+                )
+            except ActivityError as e:
+                cause = e.cause
+
+                if isinstance(cause, ApplicationError) and cause.type == "ValidationError":
+                    self.validation_errors = self._extract_validation_errors(cause)
+                    continue
+
+                raise
 
             next_step = step_config.get("next")
 
@@ -137,6 +148,16 @@ class ConfigDrivenCaseWorkflow:
                 errors[name] = "This field is required"
 
         return errors
+
+    def _extract_validation_errors(self, err: ApplicationError) -> dict[str, str]:
+        details = list(err.details)
+
+        if details and isinstance(details[0], dict):
+            first = details[0]
+            if all(isinstance(k, str) and isinstance(v, str) for k, v in first.items()):
+                return first
+
+        return {"form": str(err)}
 
     def _get_activity_fn(self, activity_name: str):
         activity_map = {
