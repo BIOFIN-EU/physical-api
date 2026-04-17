@@ -292,14 +292,25 @@ async def list_case_documents(
         for doc in documents
     ]
 
+
 @router.get("/cases/{case_id}/data", response_model=dict[str, Any])
-async def get_cases(
+async def get_case_data(
+    case_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    payload = await build_case_payload(db=db, case_id=case_id)
 
-    cases = await get_case_workflow_config(db=db, case_id=case_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Case payload not found")
 
-    return cases
+    workflow_config = await get_case_workflow_config(db=db, case_id=case_id)
+
+    if workflow_config is None:
+        raise HTTPException(status_code=404, detail="Case Workflow Config not found")
+
+    payload["workflow_config"] = workflow_config
+
+    return payload
 
 
 @router.get("/cases")
