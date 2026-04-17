@@ -228,6 +228,23 @@ async def build_case_payload(
     return payload
 
 
+async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
+    result = await db.execute(select(Case))
+    cases = result.scalars().all()
+
+    return [
+        {
+            "caseId": case.id,
+            "caseType": case.case_type,
+            "status": case.status,
+            "createdBy": str(case.created_by),
+            "createdAt": to_json_value(case.created_at),
+            "updatedBy": str(case.updated_by),
+            "updatedAt": to_json_value(case.updated_at),
+        }
+        for case in cases
+    ]
+
 async def get_case_workflow_config(
     db: AsyncSession,
     case_id: int,

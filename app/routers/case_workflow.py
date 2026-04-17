@@ -13,7 +13,7 @@ from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.file_storage_service import store_upload
 from app.dependencies.gateway_identity import get_request_user_id
 from sqlalchemy import select
-from app.services.case_state import build_case_payload, get_case_workflow_config
+from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
 from app.models.case_data import CaseDocument
 from app.services.object_storage_service import get_presigned_download_url
 
@@ -292,6 +292,22 @@ async def list_case_documents(
         for doc in documents
     ]
 
+@router.get("/cases/{case_id}/data", response_model=dict[str, Any])
+async def get_cases(
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+
+    cases = await get_case_workflow_config(db=db, case_id=case_id)
+
+    return cases
+
+
+@router.get("/cases")
+async def get_cases(
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    cases = await fetch_cases(db=db)
+    return cases
 
 @router.get("/cases/{case_id}/data", response_model=dict[str, Any])
 async def get_case_data(
