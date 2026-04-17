@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
+from typing import Any
 from pathlib import Path
 from uuid import uuid4
 from app.core.db import get_db
@@ -12,7 +13,7 @@ from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.file_storage_service import store_upload
 from app.dependencies.gateway_identity import get_request_user_id
 from sqlalchemy import select
-
+from app.services.case_state import build_case_payload
 from app.models.case_data import CaseDocument
 from app.services.object_storage_service import get_presigned_download_url
 
@@ -278,7 +279,7 @@ async def list_case_documents(
 
     return [
         {
-            "case_document_id": doc.case_document_id,
+            "case_document_id": doc.id,
             "case_id": doc.case_id,
             "step_code": doc.step_code,
             "field_name": doc.field_name,
@@ -290,3 +291,16 @@ async def list_case_documents(
         }
         for doc in documents
     ]
+
+
+@router.get("/cases/{case_id}/data", response_model=dict[str, Any])
+async def get_case_data(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    payload = await build_case_payload(db=db, case_id=case_id)
+
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    return payload

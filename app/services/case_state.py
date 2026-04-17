@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from datetime import datetime
+from typing import Any, Callable
+
+from sqlalchemy import inspect, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.case_data import (
+    Case,
+    CaseLocation,
+    CaseFinancial,
+    CaseIdentifiers,
+    Operator,
+    CaseDocument,
+)
+
+def to_json_value(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def orm_to_dict(obj: Any, exclude: set[str] | None = None) -> dict[str, Any]:
+    exclude = exclude or set()
+
+    mapper = inspect(obj.__class__)
+    data: dict[str, Any] = {}
+
+    for attr in mapper.column_attrs:
+        key = attr.key
+        if key in exclude:
+            continue
+        data[key] = to_json_value(getattr(obj, key))
+
+    return data
+
+@dataclass
+class SectionConfig:
+    model: type
+    many: bool = False
+    exclude: set[str] | None = None
+    loader_options: tuple[Any, ...] = ()
+    serializer: Callable[[Any], dict[str, Any]] | None = None
+
+
+def serialize_location(row: CaseLocation) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
+def serialize_identifiers(row: CaseIdentifiers) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
+def serialize_financial(row: CaseFinancial) -> dict[str, Any]:
+    data = orm_to_dict(
+        row,
+        exclude={
+            "id",
+            "case_id",
+            "created_at",
+            "updated_at",
+            "use_of_proceeds_id",
+        },
+    )
+
+    data["use_of_proceeds"] = (
+        {
+            "id": row.use_of_proceeds.id,
+            "code": row.use_of_proceeds.code,
+            "name": row.use_of_proceeds.name,
+            "description": row.use_of_proceeds.description,
+        }
+        if row.use_of_proceeds
+        else None
+    )
+
+    return data
+
+
+def serialize_operator(row: Operator) -> dict[str, Any]:
+    data = orm_to_dict(
+        row,
+        exclude={
+            "id",
+            "case_id",
+            "created_at",
+            "updated_at",
+            "operator_specialty_id",
+        },
+    )
+
+    data["operator_specialty"] = (
+        {
+            "id": row.operator_specialty.id,
+            "code": row.operator_specialty.code,
+            "name": row.operator_specialty.name,
+            "description": row.operator_specialty.description,
+        }
+        if row.operator_specialty
+        else None
+    )
+
+    return data
+
+
+def serialize_document(row: CaseDocument) -> dict[str, Any]:
+    return {
+        "case_document_id": row.id,  # or row.case_document_id if that is your actual field
+        "case_id": row.case_id,
+        "step_code": row.step_code,
+        "field_name": row.field_name,
+        "original_filename": row.original_filename,
+        "upload_token": row.upload_token,
+        "content_type": row.content_type,
+        "size_bytes": row.size_bytes,
+        "created_at": to_json_value(row.created_at),
+    }
+
+
+SECTION_CONFIG: dict[str, SectionConfig] = {
+    "location": SectionConfig(
+        model=CaseLocation,
+        serializer=serialize_location,
+    ),
+    "financial": SectionConfig(
+        model=CaseFinancial,
+        loader_options=(selectinload(CaseFinancial.use_of_proceeds),),
+        serializer=serialize_financial,
+    ),
+    "identifiers": SectionConfig(
+        model=CaseIdentifiers,
+        serializer=serialize_identifiers,
+    ),
+    "operators": SectionConfig(
+        model=Operator,
+        many=True,
+        loader_options=(selectinload(Operator.operator_specialty),),
+        serializer=serialize_operator,
+    ),
+    "documents": SectionConfig(
+        model=CaseDocument,
+        many=True,
+        serializer=serialize_document,
+    ),
+}
+
+
+async def fetch_section(
+    db: AsyncSession,
+    *,
+    model: type,
+    case_id: int,
+    many: bool,
+    loader_options: tuple[Any, ...] = (),
+) -> Any:
+    stmt = select(model).where(model.case_id == case_id)
+
+    for option in loader_options:
+        stmt = stmt.options(option)
+
+    result = await db.execute(stmt)
+    scalars = result.scalars()
+
+    if many:
+        return scalars.all()
+
+    return scalars.one_or_none()
+
+
+def serialize_row(row: Any, cfg: SectionConfig) -> dict[str, Any]:
+    if cfg.serializer:
+        return cfg.serializer(row)
+
+    return orm_to_dict(row, exclude=cfg.exclude)
+
+
+async def build_case_payload(
+    db: AsyncSession,
+    case_id: int,
+) -> dict[str, Any] | None:
+    case = await db.get(Case, case_id)
+    if case is None:
+        return None
+
+    payload: dict[str, Any] = {
+        "caseId": case.id,
+        "caseType": case.case_type,
+        "status": case.status,
+        "createdBy": str(case.created_by),
+        "createdAt": to_json_value(case.created_at),
+        "updatedBy": str(case.updated_by),
+        "updatedAt": to_json_value(case.updated_at),
+    }
+
+    for section_name, cfg in SECTION_CONFIG.items():
+        rows = await fetch_section(
+            db,
+            model=cfg.model,
+            case_id=case_id,
+            many=cfg.many,
+            loader_options=cfg.loader_options,
+        )
+
+        if cfg.many:
+            payload[section_name] = [
+                serialize_row(row, cfg)
+                for row in rows
+            ]
+        else:
+            payload[section_name] = (
+                serialize_row(rows, cfg)
+                if rows is not None
+                else None
+            )
+
+    return payload
