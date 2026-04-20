@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from datetime import timedelta
 from typing import Any
 
@@ -25,85 +26,86 @@ class ConfigDrivenCaseWorkflow:
         self.case_id: int | None = None
         self.workflow_code: str | None = None
         self.workflow_config: dict[str, Any] = {}
+        self.temporal_workflow_id: str | None = None
         self.current_step: str | None = None
-        self.status: str = "running"
+        self.status: str = "draft"
         self.validation_errors: dict[str, str] = {}
 
-        self._pending_submission: dict[str, Any] | None = None
-        self._submission_ready: bool = False
+        self._submission_queue: deque[dict[str, Any]] = deque()
 
     @workflow.run
     async def run(self, runtime_input: WorkflowRuntimeInput) -> dict[str, Any]:
         self.case_id = runtime_input.case_id
         self.workflow_code = runtime_input.workflow_code
         self.workflow_config = runtime_input.workflow_config
+        self.temporal_workflow_id = workflow.info().workflow_id
 
         self.current_step = self.workflow_config["start_step"]
-        self.status = "running"
+        self.status = "in_progress"
         self.validation_errors = {}
 
-        await workflow.execute_activity(
-            update_run_state,
-            args=[self.case_id, self.current_step, self.status],
-            start_to_close_timeout=timedelta(seconds=30),
-        )
+        await self._persist_state()
 
-        while self.status == "running":
-            await workflow.wait_condition(lambda: self._submission_ready)
+        try:
+            while self.status == "in_progress":
+                await workflow.wait_condition(lambda: len(self._submission_queue) > 0)
 
-            payload = self._pending_submission or {}
-            self._pending_submission = None
-            self._submission_ready = False
+                payload = self._submission_queue.popleft()
 
-            step_name = self.current_step
-            if not step_name:
-                self.status = "completed"
-                break
+                step_name = self.current_step
+                if not step_name:
+                    self.status = "completed"
+                    break
 
-            step_config = self.workflow_config["steps"][step_name]
+                step_config = self.workflow_config["steps"][step_name]
 
-            errors = self._validate_required_fields(step_config, payload)
-            if errors:
-                self.validation_errors = errors
-                continue
-
-            self.validation_errors = {}
-
-            activity_name = step_config["activity"]
-            activity_fn = self._get_activity_fn(activity_name)
-
-            try:
-                await workflow.execute_activity(
-                    activity_fn,
-                    args=[self.case_id, payload],
-                    start_to_close_timeout=timedelta(seconds=30),
-                )
-            except ActivityError as e:
-                cause = e.cause
-
-                if isinstance(cause, ApplicationError) and cause.type == "ValidationError":
-                    self.validation_errors = self._extract_validation_errors(cause)
+                errors = self._validate_required_fields(step_config, payload)
+                if errors:
+                    self.validation_errors = errors
                     continue
 
-                raise
+                self.validation_errors = {}
 
-            next_step = step_config.get("next")
+                activity_name = step_config["activity"]
+                activity_fn = self._get_activity_fn(activity_name)
 
-            if next_step:
-                self.current_step = next_step
-                self.status = "running"
-            else:
-                self.current_step = None
-                self.status = "completed"
+                try:
+                    await workflow.execute_activity(
+                        activity_fn,
+                        args=[self.case_id, payload],
+                        start_to_close_timeout=timedelta(seconds=30),
+                    )
+                except ActivityError as e:
+                    cause = e.cause
 
-            await workflow.execute_activity(
-                update_run_state,
-                args=[self.case_id, self.current_step or "", self.status],
-                start_to_close_timeout=timedelta(seconds=30),
-            )
+                    if isinstance(cause, ApplicationError) and cause.type == "ValidationError":
+                        self.validation_errors = self._extract_validation_errors(cause)
+                        continue
+
+                    self.status = "failed"
+                    await self._persist_state()
+                    raise
+
+                next_step = step_config.get("next")
+
+                if next_step:
+                    self.current_step = next_step
+                    self.status = "in_progress"
+                else:
+                    self.current_step = None
+                    self.status = "completed"
+
+                await self._persist_state()
+
+        except Exception:
+            if self.status != "failed":
+                self.status = "failed"
+                await self._persist_state()
+            raise
 
         return {
             "case_id": self.case_id,
+            "temporal_workflow_id": self.temporal_workflow_id,
             "workflow_code": self.workflow_code,
             "current_step": self.current_step,
             "status": self.status,
@@ -118,6 +120,7 @@ class ConfigDrivenCaseWorkflow:
 
         return {
             "case_id": self.case_id,
+            "temporal_workflow_id": self.temporal_workflow_id,
             "workflow_code": self.workflow_code,
             "current_step": self.current_step,
             "status": self.status,
@@ -127,8 +130,14 @@ class ConfigDrivenCaseWorkflow:
 
     @workflow.signal
     def submit_step(self, payload: dict[str, Any]) -> None:
-        self._pending_submission = payload
-        self._submission_ready = True
+        self._submission_queue.append(payload)
+
+    async def _persist_state(self) -> None:
+        await workflow.execute_activity(
+            update_run_state,
+            args=[self.case_id, self.current_step, self.status],
+            start_to_close_timeout=timedelta(seconds=30),
+        )
 
     def _validate_required_fields(
         self,
@@ -166,7 +175,13 @@ class ConfigDrivenCaseWorkflow:
             "save_identifiers_step": save_identifiers_step,
             "save_supporting_document_step": save_supporting_document_step,
         }
-        if activity_name not in activity_map:
-            raise ValueError(f"Unknown activity: {activity_name}")
 
-        return activity_map[activity_name]
+        activity_fn = activity_map.get(activity_name)
+        if activity_fn is None:
+            raise ApplicationError(
+                f"Unknown activity: {activity_name}",
+                type="ConfigurationError",
+                non_retryable=True,
+            )
+
+        return activity_fn

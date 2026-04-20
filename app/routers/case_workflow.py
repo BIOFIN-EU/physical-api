@@ -1,29 +1,29 @@
 import asyncio
 import logging
+from typing import Any
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
-from typing import Any
-from pathlib import Path
-from uuid import uuid4
+
 from app.core.db import get_db
 from app.core.settings import settings
-from app.services.workflow_runtime_service import WorkflowRuntimeService
-from app.services.workflow_config_service import WorkflowNotFoundError
-from app.services.file_storage_service import store_upload
 from app.dependencies.gateway_identity import get_request_user_id
-from sqlalchemy import select
-from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
 from app.models.case_data import CaseDocument
+from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
+from app.services.file_storage_service import store_upload
 from app.services.object_storage_service import get_presigned_download_url
+from app.services.workflow_config_service import WorkflowNotFoundError
+from app.services.workflow_runtime_service import WorkflowRuntimeService
 
 logger = logging.getLogger(__name__)
-
 
 router = APIRouter()
 
 
-def _validate_fields(step_config: dict, payload: dict) -> dict:
+def _validate_fields(step_config: dict, payload: dict) -> dict[str, str]:
     errors: dict[str, str] = {}
 
     for field in step_config.get("fields", []):
@@ -53,17 +53,16 @@ def _validate_fields(step_config: dict, payload: dict) -> dict:
 
 @router.post("/cases/start")
 async def start_case(
-        workflow_code: str,
-        db: AsyncSession = Depends(get_db),
-        user_id: str = Depends(get_request_user_id)
-
+    workflow_code: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
 ) -> dict:
     service = WorkflowRuntimeService(db)
 
     try:
-        workflow_id = await service.start_workflow(
+        temporal_workflow_id = await service.start_workflow(
             workflow_code=workflow_code,
-            user_id=str(user_id),
+            user_id=user_id,
         )
     except WorkflowNotFoundError:
         raise HTTPException(
@@ -71,11 +70,11 @@ async def start_case(
             detail=f"Workflow '{workflow_code}' not found",
         )
 
-    case_id = int(workflow_id.replace("case-", ""))
+    case_id = int(temporal_workflow_id.replace("case-", ""))
 
     return {
         "case_id": case_id,
-        "workflow_id": workflow_id,
+        "temporal_workflow_id": temporal_workflow_id,
         "workflow_code": workflow_code,
     }
 
@@ -96,7 +95,7 @@ async def get_case_state(
 
     workflow_state["documents"] = [
         {
-            "case_document_id": doc.case_document_id,
+            "case_document_id": doc.id,
             "case_id": doc.case_id,
             "step_code": doc.step_code,
             "field_name": doc.field_name,
@@ -111,9 +110,10 @@ async def get_case_state(
 
     return workflow_state
 
+
 @router.post("/cases/{case_id}/submit-json")
 async def submit_step(case_id: int, payload: dict) -> dict:
-    logging.info("Received payload for case %s: %s", case_id, payload)
+    logger.info("Received payload for case %s: %s", case_id, payload)
 
     client = await Client.connect(settings.TEMPORAL_ADDRESS)
     handle = client.get_workflow_handle(f"case-{case_id}")
@@ -184,6 +184,7 @@ async def submit_file_step(
     before_state = await handle.query("get_state")
     current_step = before_state.get("current_step")
     step_config = before_state.get("step", {})
+    before_status = before_state.get("status")
 
     if not current_step:
         raise HTTPException(status_code=400, detail="No current step available")
@@ -218,20 +219,38 @@ async def submit_file_step(
 
     await handle.signal("submit_step", signal_payload)
 
-    for _ in range(10):
+    for _ in range(15):
         await asyncio.sleep(0.2)
         state = await handle.query("get_state")
 
-        if state.get("current_step") != current_step or state.get("validation_errors"):
+        validation_errors = state.get("validation_errors") or {}
+        new_step = state.get("current_step")
+        new_status = state.get("status")
+
+        if validation_errors:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Validation failed",
+                    "current_step": new_step,
+                    "field_errors": validation_errors,
+                },
+            )
+
+        if new_step != current_step or new_status != before_status:
             return {
                 "message": "File step submitted successfully",
                 "state": state,
             }
 
-    return {
-        "message": "File step submitted",
-        "state": await handle.query("get_state"),
-    }
+    raise HTTPException(
+        status_code=202,
+        detail={
+            "message": "File submission accepted and is still processing",
+            "state": await handle.query("get_state"),
+        },
+    )
+
 
 @router.get("/cases/{case_id}/documents/{case_document_id}/download-url")
 async def get_document_download_url(
@@ -241,7 +260,7 @@ async def get_document_download_url(
 ) -> dict:
     result = await db.execute(
         select(CaseDocument).where(
-            CaseDocument.case_document_id == case_document_id,
+            CaseDocument.id == case_document_id,
             CaseDocument.case_id == case_id,
         )
     )
@@ -257,7 +276,7 @@ async def get_document_download_url(
     )
 
     return {
-        "case_document_id": document.case_document_id,
+        "case_document_id": document.id,
         "case_id": document.case_id,
         "original_filename": document.original_filename,
         "upload_token": document.upload_token,
@@ -266,6 +285,7 @@ async def get_document_download_url(
         "download_url": download_url,
         "expires_in_seconds": 3600,
     }
+
 
 @router.get("/cases/{case_id}/documents")
 async def list_case_documents(
@@ -319,22 +339,3 @@ async def get_cases(
 ) -> list[dict[str, Any]]:
     cases = await fetch_cases(db=db)
     return cases
-
-@router.get("/cases/{case_id}/data", response_model=dict[str, Any])
-async def get_case_data(
-    case_id: int,
-    db: AsyncSession = Depends(get_db),
-) -> dict[str, Any]:
-    payload = await build_case_payload(db=db, case_id=case_id)
-
-    if payload is None:
-        raise HTTPException(status_code=404, detail="Case payload not found")
-
-    workflow_config = await get_case_workflow_config(db=db, case_id=case_id)
-
-    if workflow_config is None:
-        raise HTTPException(status_code=404, detail="Case Workflow Config not found")
-
-    payload["workflow_config"] = workflow_config
-
-    return payload

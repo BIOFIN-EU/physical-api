@@ -18,6 +18,7 @@ from app.models.case_data import (
     CaseDocument,
 )
 
+
 def to_json_value(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
@@ -40,6 +41,7 @@ def orm_to_dict(obj: Any, exclude: set[str] | None = None) -> dict[str, Any]:
 
     return data
 
+
 @dataclass
 class SectionConfig:
     model: type
@@ -50,10 +52,22 @@ class SectionConfig:
 
 
 def serialize_location(row: CaseLocation) -> dict[str, Any]:
-    return orm_to_dict(
+    data = orm_to_dict(
         row,
-        exclude={"id", "case_id", "created_at", "updated_at"},
+        exclude={"id", "case_id", "created_at", "updated_at", "country_id"},
     )
+
+    data["country"] = (
+        {
+            "id": row.country.id,
+            "code": row.country.code,
+            "name": row.country.name,
+        }
+        if row.country
+        else None
+    )
+
+    return data
 
 
 def serialize_identifiers(row: CaseIdentifiers) -> dict[str, Any]:
@@ -132,6 +146,7 @@ def serialize_document(row: CaseDocument) -> dict[str, Any]:
 SECTION_CONFIG: dict[str, SectionConfig] = {
     "location": SectionConfig(
         model=CaseLocation,
+        loader_options=(selectinload(CaseLocation.country),),
         serializer=serialize_location,
     ),
     "financial": SectionConfig(
@@ -156,14 +171,15 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
     ),
 }
 
-#todo check if can be integrated into main db call
+
+# todo check if can be integrated into main db call
 async def fetch_section(
-    db: AsyncSession,
-    *,
-    model: type,
-    case_id: int,
-    many: bool,
-    loader_options: tuple[Any, ...] = (),
+        db: AsyncSession,
+        *,
+        model: type,
+        case_id: int,
+        many: bool,
+        loader_options: tuple[Any, ...] = (),
 ) -> Any:
     stmt = select(model).where(model.case_id == case_id)
 
@@ -187,8 +203,8 @@ def serialize_row(row: Any, cfg: SectionConfig) -> dict[str, Any]:
 
 
 async def build_case_payload(
-    db: AsyncSession,
-    case_id: int,
+        db: AsyncSession,
+        case_id: int,
 ) -> dict[str, Any] | None:
     case = await db.get(Case, case_id)
     if case is None:
@@ -245,9 +261,10 @@ async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
         for case in cases
     ]
 
+
 async def get_case_workflow_config(
-    db: AsyncSession,
-    case_id: int,
+        db: AsyncSession,
+        case_id: int,
 ) -> dict[str, Any] | None:
     config_service = WorkflowConfigService()
 

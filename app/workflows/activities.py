@@ -13,6 +13,7 @@ from temporalio.exceptions import ApplicationError
 from pydantic import ValidationError
 
 from app.core.settings import settings
+from app.models.case_data import Case
 from app.models.workflow import CaseWorkflowRun
 from app.models.case_data import (
     CaseLocation,
@@ -155,6 +156,37 @@ def _parse_pydantic(model_cls, data: dict) -> Any:
         )
 
 
+# --- Shared helpers ---
+def _get_case_or_raise(session: Session, case_id: int) -> Case:
+    case = session.execute(
+        select(Case).where(Case.id == case_id)
+    ).scalar_one_or_none()
+
+    if not case:
+        raise ApplicationError(
+            f"Case {case_id} not found.",
+            type="NotFoundError",
+            non_retryable=True,
+        )
+
+    return case
+
+
+def _get_run_or_raise(session: Session, case_id: int) -> CaseWorkflowRun:
+    run = session.execute(
+        select(CaseWorkflowRun).where(CaseWorkflowRun.case_id == case_id)
+    ).scalar_one_or_none()
+
+    if not run:
+        raise ApplicationError(
+            f"Workflow run for case {case_id} not found.",
+            type="NotFoundError",
+            non_retryable=True,
+        )
+
+    return run
+
+
 # --- Activities ---
 
 @activity.defn
@@ -168,7 +200,7 @@ def save_location_step(case_id: int, data: dict) -> None:
 
         if existing:
             existing.polygon_wkt = payload.polygon_wkt
-            existing.country = payload.country
+            existing.country_id = payload.country_id
             existing.region = payload.region
             existing.notes = payload.notes
         else:
@@ -176,7 +208,7 @@ def save_location_step(case_id: int, data: dict) -> None:
                 CaseLocation(
                     case_id=case_id,
                     polygon_wkt=payload.polygon_wkt,
-                    country=payload.country,
+                    country_id=payload.country_id,
                     region=payload.region,
                     notes=payload.notes,
                 )
@@ -249,14 +281,18 @@ def save_identifiers_step(case_id: int, data: dict) -> None:
 
 
 @activity.defn
-def update_run_state(case_id: int, current_step: str, status: str) -> None:
+def update_run_state(
+    case_id: int,
+    current_step: str | None,
+    status: str,
+) -> None:
     with SessionLocal() as session:
-        run = session.execute(
-            select(CaseWorkflowRun).where(CaseWorkflowRun.case_id == case_id)
-        ).scalar_one()
+        case = _get_case_or_raise(session, case_id)
+        run = _get_run_or_raise(session, case_id)
 
-        run.current_step = current_step
+        case.status = status
         run.status = status
+        run.current_step = current_step
 
         _commit_or_raise(session)
 
@@ -273,21 +309,40 @@ def save_supporting_document_step(case_id: int, data: dict) -> None:
     supporting_document = _validate_file_metadata(data.get(field_name), field_name)
 
     with SessionLocal() as session:
-        session.add(
-            CaseDocument(
-                case_id=case_id,
-                step_code=step_code,
-                field_name=field_name,
-                original_filename=supporting_document["original_filename"],
-                stored_filename=supporting_document["stored_filename"],
-                upload_token=supporting_document["upload_token"],
-                content_type=supporting_document.get("content_type"),
-                size_bytes=supporting_document.get("size_bytes"),
-                storage_provider=supporting_document["storage_provider"],
-                bucket_name=supporting_document["bucket_name"],
-                object_key=supporting_document["object_key"],
-                notes=document_notes,
+        existing = session.execute(
+            select(CaseDocument).where(
+                CaseDocument.case_id == case_id,
+                CaseDocument.step_code == step_code,
+                CaseDocument.field_name == field_name,
             )
-        )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.original_filename = supporting_document["original_filename"]
+            existing.stored_filename = supporting_document["stored_filename"]
+            existing.upload_token = supporting_document["upload_token"]
+            existing.content_type = supporting_document.get("content_type")
+            existing.size_bytes = supporting_document.get("size_bytes")
+            existing.storage_provider = supporting_document["storage_provider"]
+            existing.bucket_name = supporting_document["bucket_name"]
+            existing.object_key = supporting_document["object_key"]
+            existing.notes = document_notes
+        else:
+            session.add(
+                CaseDocument(
+                    case_id=case_id,
+                    step_code=step_code,
+                    field_name=field_name,
+                    original_filename=supporting_document["original_filename"],
+                    stored_filename=supporting_document["stored_filename"],
+                    upload_token=supporting_document["upload_token"],
+                    content_type=supporting_document.get("content_type"),
+                    size_bytes=supporting_document.get("size_bytes"),
+                    storage_provider=supporting_document["storage_provider"],
+                    bucket_name=supporting_document["bucket_name"],
+                    object_key=supporting_document["object_key"],
+                    notes=document_notes,
+                )
+            )
 
         _commit_or_raise(session)

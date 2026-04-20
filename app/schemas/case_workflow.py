@@ -1,12 +1,12 @@
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 
 from pydantic import BaseModel, Field
 
 
 class LocationStepInput(BaseModel):
     polygon_wkt: str
-    country: Optional[str] = None
+    country_id: int
     region: Optional[str] = None
     notes: Optional[str] = None
 
@@ -28,7 +28,8 @@ class IdentifiersStepInput(BaseModel):
 
 class WorkflowStateResponse(BaseModel):
     case_id: int
-    workflow_id: str
-    current_step: Literal["location", "financial", "registration", "completed"]
-    status: str
-    screen: dict
+    temporal_workflow_id: str
+    workflow_code: str
+    current_step: Optional[str]
+    status: Literal["draft", "in_progress", "completed", "failed"]
+    screen: dict[str, Any]

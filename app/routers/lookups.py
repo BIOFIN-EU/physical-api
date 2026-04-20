@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Type
 
 from app.core.db import get_db
-from app.models.case_data import UseOfProceeds, OperatorSpecialty
+from app.models.case_data import UseOfProceeds, OperatorSpecialty, Country
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ router = APIRouter()
 LOOKUP_MODELS: dict[str, Type] = {
     "use_of_proceeds": UseOfProceeds,
     "operator_specialties": OperatorSpecialty,
+    "country": Country
 }
 
 

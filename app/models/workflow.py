@@ -53,8 +53,8 @@ class CaseWorkflowRun(Base):
     temporal_workflow_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     temporal_run_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    current_step: Mapped[str] = mapped_column(String(100), nullable=False, default="location")
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="in_progress")
+    current_step: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

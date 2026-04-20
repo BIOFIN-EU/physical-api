@@ -72,7 +72,7 @@ class OperatorSpecialtyRead(ORMBaseSchema):
 class CaseLocationBase(BaseModel):
     case_id: int
     polygon_wkt: str
-    country: Optional[str] = Field(None, max_length=100)
+    country_id: int
     region: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
 
@@ -83,7 +83,7 @@ class CaseLocationCreate(CaseLocationBase):
 
 class CaseLocationUpdate(BaseModel):
     polygon_wkt: Optional[str] = None
-    country: Optional[str] = Field(None, max_length=100)
+    country_id: Optional[int] = None
     region: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
 
@@ -92,12 +92,12 @@ class CaseLocationRead(ORMBaseSchema):
     id: int
     case_id: int
     polygon_wkt: str
-    country: Optional[str] = None
+    country_id: int
+    country_name: Optional[str] = None
     region: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-
 
 # ---------------------------------------------------------
 # CaseFinancial
@@ -207,3 +207,31 @@ class OperatorRead(ORMBaseSchema):
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------
+# Country
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# Lookup tables
+# ---------------------------------------------------------
+
+class CountryBase(BaseModel):
+    code: str = Field(..., max_length=2)
+    name: str = Field(..., max_length=100)
+
+
+class CountryCreate(CountryBase):
+    pass
+
+
+class CountryUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=2)
+    name: Optional[str] = Field(None, max_length=100)
+
+
+class CountryRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str

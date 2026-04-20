@@ -18,10 +18,11 @@
               "required": true
             },
             {
-              "name": "country",
+              "name": "country_id",
               "display_name": "Country",
-              "type": "text",
-              "required": false
+              "type": "select",
+              "required": true,
+              "options_source": "country"
             },
             {
               "name": "region",
@@ -127,10 +128,11 @@
               "required": true
             },
             {
-              "name": "country",
+              "name": "country_id",
               "display_name": "Country",
-              "type": "text",
-              "required": false
+              "type": "select",
+              "required": true,
+              "options_source": "country"
             },
             {
               "name": "region",

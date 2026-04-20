@@ -55,25 +55,28 @@ class CaseLocation(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    # Cross-schema link to workflow case
     case_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    # Store polygon as WKT for now, simple and easy to test
     polygon_wkt: Mapped[str] = mapped_column(Text, nullable=False)
 
-    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.countries.id"),
+        nullable=False,
+    )
+    country: Mapped["Country"] = relationship()
+
     region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-
-
 # ---------------------------------------------------------
 # 2. Financial table
 # ---------------------------------------------------------
@@ -252,4 +255,24 @@ class CaseDocument(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+# ---------------------------------------------------------
+# Country
+# ---------------------------------------------------------
+
+class Country(Base):
+    __tablename__ = "countries"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(
+        SmallInteger, primary_key=True, autoincrement=True
+    )
+
+    code: Mapped[str] = mapped_column(
+        String(2), unique=True, nullable=False
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(100), nullable=False
     )

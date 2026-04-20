@@ -20,7 +20,6 @@ TASK_QUEUE = os.getenv("TEMPORAL_TASK_QUEUE", "case-workflow-task-queue")
 
 async def main() -> None:
     client = await Client.connect(TEMPORAL_ADDRESS)
-
     activity_executor = ThreadPoolExecutor(max_workers=10)
 
     worker = Worker(
