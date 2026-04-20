@@ -208,9 +208,9 @@
           "submit_mode": "json",
           "fields": [
             {
-              "name": "financing_type_ids",
+              "name": "financing_type_id",
               "display_name": "Financing Type",
-              "type": "multiselect",
+              "type": "select",
               "required": true,
               "options_source": "financing_type"
             }
@@ -334,7 +334,7 @@
         "investment_rationale": {
           "title": "Rationale for Attracting Investment",
           "activity": "save_investment_rationale_step",
-          "next": null,
+          "next": "supporting_document",
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -353,6 +353,27 @@
             {
               "name": "additional_rationale",
               "display_name": "Additional Rationale",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "supporting_document": {
+          "title": "Supporting document",
+          "activity": "save_supporting_document_step",
+          "next": null,
+          "ui_mode": "file_form",
+          "submit_mode": "multipart",
+          "fields": [
+            {
+              "name": "supporting_document",
+              "display_name": "Supporting Document",
+              "type": "file",
+              "required": true
+            },
+            {
+              "name": "document_notes",
+              "display_name": "Document Notes",
               "type": "textarea",
               "required": false
             }

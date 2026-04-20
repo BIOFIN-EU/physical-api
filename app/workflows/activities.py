@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -20,11 +20,21 @@ from app.models.case_data import (
     CaseFinancial,
     CaseIdentifiers,
     CaseDocument,
+    CaseBasicInfo,
+    CaseFinancingType,
+    CaseNatureBasedSolution,
+    CaseFundingRequirement,
+    CaseInvestmentRationale,
 )
 from app.schemas.case_workflow import (
     LocationStepInput,
     FinancialStepInput,
     IdentifiersStepInput,
+    BasicInfoStepInput,
+    FinancingTypeStepInput,
+    NatureBasedSolutionStepInput,
+    FundingRequirementsStepInput,
+    InvestmentRationaleStepInput,
 )
 
 
@@ -68,6 +78,16 @@ def _handle_integrity_error(exc: IntegrityError) -> None:
             },
         )
 
+    if "ck_case_funding_requirements_total_matches_breakdown" in text:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {
+                "funding_amount": "Funding amount must equal direct funding plus indirect funding.",
+                "direct_funding_amount": "Direct funding plus indirect funding must match the total funding amount.",
+                "indirect_funding_amount": "Direct funding plus indirect funding must match the total funding amount.",
+            },
+        )
+
     raise exc
 
 
@@ -103,6 +123,21 @@ def _validate_non_empty_string(value: Any, field_name: str, display_name: str) -
         )
 
 
+def _validate_non_empty_list_of_ints(value: Any, field_name: str, display_name: str) -> None:
+    if not isinstance(value, list) or not value:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {field_name: f"{display_name} must contain at least one selection."},
+        )
+
+    for item in value:
+        if not isinstance(item, int):
+            _raise_validation_error(
+                "Please correct the highlighted fields.",
+                {field_name: f"Each {display_name} value must be an integer."},
+            )
+
+
 def _validate_file_metadata(
     supporting_document: Any,
     field_name: str,
@@ -136,6 +171,27 @@ def _validate_file_metadata(
         )
 
     return supporting_document
+
+
+def _validate_funding_breakdown(
+    funding_amount: Decimal | None,
+    direct_funding_amount: Decimal | None,
+    indirect_funding_amount: Decimal | None,
+) -> None:
+    if (
+        funding_amount is not None
+        and direct_funding_amount is not None
+        and indirect_funding_amount is not None
+    ):
+        if funding_amount != direct_funding_amount + indirect_funding_amount:
+            _raise_validation_error(
+                "Please correct the highlighted fields.",
+                {
+                    "funding_amount": "Funding amount must equal direct funding plus indirect funding.",
+                    "direct_funding_amount": "Direct funding plus indirect funding must match the total funding amount.",
+                    "indirect_funding_amount": "Direct funding plus indirect funding must match the total funding amount.",
+                },
+            )
 
 
 def _parse_pydantic(model_cls, data: dict) -> Any:
@@ -274,6 +330,153 @@ def save_identifiers_step(case_id: int, data: dict) -> None:
                     environment_scheme_number=payload.environment_scheme_number,
                     subsidy_reference=payload.subsidy_reference,
                     registry_notes=payload.registry_notes,
+                )
+            )
+
+        _commit_or_raise(session)
+
+
+@activity.defn
+def save_basic_info_step(case_id: int, data: dict) -> None:
+    payload = _parse_pydantic(BasicInfoStepInput, data)
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseBasicInfo).where(CaseBasicInfo.case_id == case_id)
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.use_case_name = payload.use_case_name
+            existing.high_level_description = payload.high_level_description
+        else:
+            session.add(
+                CaseBasicInfo(
+                    case_id=case_id,
+                    use_case_name=payload.use_case_name,
+                    high_level_description=payload.high_level_description,
+                )
+            )
+
+        _commit_or_raise(session)
+
+
+@activity.defn
+def save_financing_type_step(case_id: int, data: dict) -> None:
+    payload = _parse_pydantic(FinancingTypeStepInput, data)
+
+    if not isinstance(payload.financing_type_id, int) or payload.financing_type_id <= 0:
+        raise ValueError("Financing Type must be a positive integer.")
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseFinancingType).where(CaseFinancingType.case_id == case_id)
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.financing_type_id = payload.financing_type_id
+        else:
+            session.add(
+                CaseFinancingType(
+                    case_id=case_id,
+                    financing_type_id=payload.financing_type_id,
+                )
+            )
+
+        _commit_or_raise(session)
+
+
+@activity.defn
+def save_nature_based_solution_step(case_id: int, data: dict) -> None:
+    payload = _parse_pydantic(NatureBasedSolutionStepInput, data)
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseNatureBasedSolution).where(
+                CaseNatureBasedSolution.case_id == case_id
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.nbs_type_id = payload.nbs_type_id
+            existing.implementation_stage_id = payload.implementation_stage_id
+            existing.nbs_description = payload.nbs_description
+        else:
+            session.add(
+                CaseNatureBasedSolution(
+                    case_id=case_id,
+                    nbs_type_id=payload.nbs_type_id,
+                    implementation_stage_id=payload.implementation_stage_id,
+                    nbs_description=payload.nbs_description,
+                )
+            )
+
+        _commit_or_raise(session)
+
+
+@activity.defn
+def save_funding_requirements_step(case_id: int, data: dict) -> None:
+    payload = _parse_pydantic(FundingRequirementsStepInput, data)
+
+    _validate_funding_breakdown(
+        payload.funding_amount,
+        payload.direct_funding_amount,
+        payload.indirect_funding_amount,
+    )
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseFundingRequirement).where(
+                CaseFundingRequirement.case_id == case_id
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.funding_amount = payload.funding_amount
+            existing.currency = payload.currency
+            existing.upfront_costs = payload.upfront_costs
+            existing.maintenance_costs = payload.maintenance_costs
+            existing.direct_funding_amount = payload.direct_funding_amount
+            existing.indirect_funding_amount = payload.indirect_funding_amount
+            existing.funding_notes = payload.funding_notes
+        else:
+            session.add(
+                CaseFundingRequirement(
+                    case_id=case_id,
+                    funding_amount=payload.funding_amount,
+                    currency=payload.currency,
+                    upfront_costs=payload.upfront_costs,
+                    maintenance_costs=payload.maintenance_costs,
+                    direct_funding_amount=payload.direct_funding_amount,
+                    indirect_funding_amount=payload.indirect_funding_amount,
+                    funding_notes=payload.funding_notes,
+                )
+            )
+
+        _commit_or_raise(session)
+
+
+@activity.defn
+def save_investment_rationale_step(case_id: int, data: dict) -> None:
+    payload = _parse_pydantic(InvestmentRationaleStepInput, data)
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseInvestmentRationale).where(
+                CaseInvestmentRationale.case_id == case_id
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.nature_positive_benefits = payload.nature_positive_benefits
+            existing.legislation_compliance = payload.legislation_compliance
+            existing.additional_rationale = payload.additional_rationale
+        else:
+            session.add(
+                CaseInvestmentRationale(
+                    case_id=case_id,
+                    nature_positive_benefits=payload.nature_positive_benefits,
+                    legislation_compliance=payload.legislation_compliance,
+                    additional_rationale=payload.additional_rationale,
                 )
             )
 

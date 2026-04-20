@@ -11,11 +11,16 @@ from sqlalchemy.orm import selectinload
 from app.services.workflow_config_service import WorkflowConfigService
 from app.models.case_data import (
     Case,
+    Operator,
     CaseLocation,
     CaseFinancial,
     CaseIdentifiers,
-    Operator,
     CaseDocument,
+    CaseBasicInfo,
+    CaseFinancingType,
+    CaseNatureBasedSolution,
+    CaseFundingRequirement,
+    CaseInvestmentRationale,
 )
 
 
@@ -129,6 +134,91 @@ def serialize_operator(row: Operator) -> dict[str, Any]:
     return data
 
 
+def serialize_basic_info(row: CaseBasicInfo) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
+def serialize_investment_rationale(row: CaseInvestmentRationale) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
+def serialize_nbs(row: CaseNatureBasedSolution) -> dict[str, Any]:
+    data = orm_to_dict(
+        row,
+        exclude={
+            "id",
+            "case_id",
+            "created_at",
+            "updated_at",
+            "nbs_type_id",
+            "implementation_stage_id",
+        },
+    )
+
+    data["nbs_type"] = (
+        {
+            "id": row.nbs_type.id,
+            "code": row.nbs_type.code,
+            "name": row.nbs_type.name,
+            "description": row.nbs_type.description,
+        }
+        if row.nbs_type
+        else None
+    )
+
+    data["implementation_stage"] = (
+        {
+            "id": row.implementation_stage.id,
+            "code": row.implementation_stage.code,
+            "name": row.implementation_stage.name,
+            "description": row.implementation_stage.description,
+        }
+        if row.implementation_stage
+        else None
+    )
+
+    return data
+
+
+def serialize_funding_requirement(row: CaseFundingRequirement) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
+def serialize_financing_type(row: CaseFinancingType) -> dict[str, Any]:
+    data = orm_to_dict(
+        row,
+        exclude={
+            "id",
+            "case_id",
+            "created_at",
+            "updated_at",
+            "financing_type_id",
+        },
+    )
+
+    data["financing_type"] = (
+        {
+            "id": row.financing_type.id,
+            "code": row.financing_type.code,
+            "name": row.financing_type.name,
+            "description": row.financing_type.description,
+        }
+        if row.financing_type
+        else None
+    )
+
+    return data
+
+
 def serialize_document(row: CaseDocument) -> dict[str, Any]:
     return {
         "case_document_id": row.id,  # or row.case_document_id if that is your actual field
@@ -169,6 +259,31 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         many=True,
         serializer=serialize_document,
     ),
+    "basic_info": SectionConfig(
+        model=CaseBasicInfo,
+        serializer=serialize_basic_info,
+    ),
+    "investment_rationale": SectionConfig(
+        model=CaseInvestmentRationale,
+        serializer=serialize_investment_rationale,
+    ),
+    "nature_based_solution": SectionConfig(
+        model=CaseNatureBasedSolution,
+        serializer=serialize_nbs,
+        loader_options=(
+            selectinload(CaseNatureBasedSolution.nbs_type),
+            selectinload(CaseNatureBasedSolution.implementation_stage),
+        ),
+    ),
+    "funding_requirements": SectionConfig(
+        model=CaseFundingRequirement,
+        serializer=serialize_funding_requirement,
+    ),
+    "financing_type": SectionConfig(
+        model=CaseFinancingType,
+        serializer=serialize_financing_type,
+        loader_options=(selectinload(CaseFinancingType.financing_type),),
+    )
 }
 
 

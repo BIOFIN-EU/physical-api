@@ -375,3 +375,14 @@ This system is a **dynamic workflow engine** where:
 This allows flexible, scalable workflow design without hardcoding flows.
 
 ---
+
+
+# Example for implementing new workflow
+
+process for updating workflows
+
+update config
+update models
+update schemas
+update seeding for lookups 
+update routers lookups

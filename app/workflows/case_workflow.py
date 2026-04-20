@@ -8,17 +8,8 @@ from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 
 from app.schemas.workflow_runtime import WorkflowRuntimeInput
-
-
-with workflow.unsafe.imports_passed_through():
-    from app.workflows.activities import (
-        save_location_step,
-        save_financial_step,
-        save_identifiers_step,
-        save_supporting_document_step,
-        update_run_state,
-    )
-
+from app.workflows.activity_registry import ACTIVITY_REGISTRY
+from app.workflows.activities import update_run_state
 
 @workflow.defn
 class ConfigDrivenCaseWorkflow:
@@ -30,8 +21,8 @@ class ConfigDrivenCaseWorkflow:
         self.current_step: str | None = None
         self.status: str = "draft"
         self.validation_errors: dict[str, str] = {}
-
         self._submission_queue: deque[dict[str, Any]] = deque()
+        self.system_error: str | None = None
 
     @workflow.run
     async def run(self, runtime_input: WorkflowRuntimeInput) -> dict[str, Any]:
@@ -67,7 +58,14 @@ class ConfigDrivenCaseWorkflow:
                 self.validation_errors = {}
 
                 activity_name = step_config["activity"]
-                activity_fn = self._get_activity_fn(activity_name)
+
+                try:
+                    activity_fn = self._get_activity_fn(activity_name)
+                except ApplicationError as exc:
+                    self.status = "failed"
+                    self.system_error = str(exc)
+                    await self._persist_state()
+                    raise
 
                 try:
                     await workflow.execute_activity(
@@ -97,10 +95,16 @@ class ConfigDrivenCaseWorkflow:
 
                 await self._persist_state()
 
-        except Exception:
+
+        except Exception as exc:
+
             if self.status != "failed":
                 self.status = "failed"
+
+                self.system_error = str(exc)
+
                 await self._persist_state()
+
             raise
 
         return {
@@ -125,6 +129,7 @@ class ConfigDrivenCaseWorkflow:
             "current_step": self.current_step,
             "status": self.status,
             "validation_errors": self.validation_errors,
+            "system_error": self.system_error,
             "step": step_config,
         }
 
@@ -169,19 +174,11 @@ class ConfigDrivenCaseWorkflow:
         return {"form": str(err)}
 
     def _get_activity_fn(self, activity_name: str):
-        activity_map = {
-            "save_location_step": save_location_step,
-            "save_financial_step": save_financial_step,
-            "save_identifiers_step": save_identifiers_step,
-            "save_supporting_document_step": save_supporting_document_step,
-        }
-
-        activity_fn = activity_map.get(activity_name)
+        activity_fn = ACTIVITY_REGISTRY.get(activity_name)
         if activity_fn is None:
             raise ApplicationError(
                 f"Unknown activity: {activity_name}",
                 type="ConfigurationError",
                 non_retryable=True,
             )
-
         return activity_fn

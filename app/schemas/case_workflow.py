@@ -33,3 +33,33 @@ class WorkflowStateResponse(BaseModel):
     current_step: Optional[str]
     status: Literal["draft", "in_progress", "completed", "failed"]
     screen: dict[str, Any]
+
+class BasicInfoStepInput(BaseModel):
+    use_case_name: str
+    high_level_description: str
+
+
+class FinancingTypeStepInput(BaseModel):
+    financing_type_id: int
+
+
+class NatureBasedSolutionStepInput(BaseModel):
+    nbs_type_id: int
+    implementation_stage_id: int | None = None
+    nbs_description: str | None = None
+
+
+class FundingRequirementsStepInput(BaseModel):
+    funding_amount: Decimal | None = None
+    currency: str = "EUR"
+    upfront_costs: Decimal | None = None
+    maintenance_costs: Decimal | None = None
+    direct_funding_amount: Decimal | None = None
+    indirect_funding_amount: Decimal | None = None
+    funding_notes: str | None = None
+
+
+class InvestmentRationaleStepInput(BaseModel):
+    nature_positive_benefits: str
+    legislation_compliance: str | None = None
+    additional_rationale: str | None = None
