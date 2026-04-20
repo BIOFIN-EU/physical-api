@@ -360,20 +360,31 @@ async def build_case_payload(
 
 
 async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
-    result = await db.execute(select(Case))
-    cases = result.scalars().all()
+    stmt = (
+        select(Case, CaseBasicInfo.name, CaseBasicInfo.high_level_description)
+        .outerjoin(
+            CaseBasicInfo,
+            CaseBasicInfo.case_id == Case.id
+        )
+    )
+
+    result = await db.execute(stmt)
+
+    rows = result.all()
 
     return [
         {
             "caseId": case.id,
             "caseType": case.case_type,
             "status": case.status,
+            "name": name,
+            "description": high_level_description,
             "createdBy": str(case.created_by),
             "createdAt": to_json_value(case.created_at),
             "updatedBy": str(case.updated_by),
             "updatedAt": to_json_value(case.updated_at),
         }
-        for case in cases
+        for case, name, high_level_description in rows
     ]
 
 

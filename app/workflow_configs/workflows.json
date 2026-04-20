@@ -12,14 +12,14 @@
           "submit_mode": "json",
           "fields": [
             {
-              "name": "use_case_name",
-              "display_name": "Use Case Name",
+              "name": "name",
+              "display_name": "Project Name",
               "type": "text",
               "required": true
             },
             {
               "name": "high_level_description",
-              "display_name": "High Level Description",
+              "display_name": "Description",
               "type": "textarea",
               "required": true
             }
@@ -147,8 +147,8 @@
           "submit_mode": "json",
           "fields": [
             {
-              "name": "use_case_name",
-              "display_name": "Use Case Name",
+              "name": "name",
+              "display_name": "NbS Project Name",
               "type": "text",
               "required": true
             },
@@ -229,8 +229,8 @@
           "submit_mode": "json",
           "fields": [
             {
-              "name": "use_case_name",
-              "display_name": "Use Case Name",
+              "name": "name",
+              "display_name": "NbS Project Name",
               "type": "text",
               "required": true
             },

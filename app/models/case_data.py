@@ -60,7 +60,7 @@ class CaseBasicInfo(Base):
         nullable=False,
     )
 
-    use_case_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     high_level_description: Mapped[str] = mapped_column(Text, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

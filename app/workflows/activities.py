@@ -346,13 +346,13 @@ def save_basic_info_step(case_id: int, data: dict) -> None:
         ).scalar_one_or_none()
 
         if existing:
-            existing.use_case_name = payload.use_case_name
+            existing.name = payload.name
             existing.high_level_description = payload.high_level_description
         else:
             session.add(
                 CaseBasicInfo(
                     case_id=case_id,
-                    use_case_name=payload.use_case_name,
+                    name=payload.name,
                     high_level_description=payload.high_level_description,
                 )
             )

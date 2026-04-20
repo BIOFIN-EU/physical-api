@@ -35,7 +35,7 @@ class WorkflowStateResponse(BaseModel):
     screen: dict[str, Any]
 
 class BasicInfoStepInput(BaseModel):
-    use_case_name: str
+    name: str
     high_level_description: str
 
 

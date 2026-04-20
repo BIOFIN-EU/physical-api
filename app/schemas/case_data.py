@@ -243,7 +243,7 @@ class CountryRead(ORMBaseSchema):
 
 class CaseBasicInfoBase(BaseModel):
     case_id: int
-    use_case_name: str = Field(..., max_length=255)
+    name: str = Field(..., max_length=255)
     high_level_description: str
 
 
@@ -252,14 +252,14 @@ class CaseBasicInfoCreate(CaseBasicInfoBase):
 
 
 class CaseBasicInfoUpdate(BaseModel):
-    use_case_name: Optional[str] = Field(None, max_length=255)
+    name: Optional[str] = Field(None, max_length=255)
     high_level_description: Optional[str] = None
 
 
 class CaseBasicInfoRead(ORMBaseSchema):
     id: int
     case_id: int
-    use_case_name: str
+    name: str
     high_level_description: str
     created_at: datetime
     updated_at: datetime
