@@ -4,9 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.case_data import (
     UseOfProceeds,
     OperatorSpecialty,
-    Country
+    Country,
+    FinancingType,
+    NBSType,
+    ImplementationStage,
 )
-
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -145,6 +147,58 @@ async def seed_countries(db: AsyncSession):
         )
 
 # ---------------------------------------------------------
+# Financing Types
+# ---------------------------------------------------------
+
+async def seed_financing_types(db: AsyncSession):
+    values = [
+        ("private", "Private Financing", "Financing from private investors or institutions"),
+        ("public", "Public Financing", "Funding from government or public sector"),
+        ("hybrid", "Hybrid Financing", "Combination of public and private funding"),
+        ("blended_finance", "Blended Finance", "Use of public funds to de-risk private investment"),
+        ("philanthropic", "Philanthropic Funding", "Grants or donations from foundations"),
+    ]
+
+    for code, name, description in values:
+        await _upsert_by_code(db, FinancingType, code, name, description)
+
+
+# ---------------------------------------------------------
+# NBS Types
+# ---------------------------------------------------------
+
+async def seed_nbs_types(db: AsyncSession):
+    values = [
+        ("agroforestry", "Agroforestry", "Integration of trees into agricultural systems"),
+        ("wetland_restoration", "Wetland Restoration", "Restoration of wetlands for biodiversity and water regulation"),
+        ("reforestation", "Reforestation", "Planting trees to restore forest ecosystems"),
+        ("soil_restoration", "Soil Restoration", "Improving soil health and fertility"),
+        ("river_restoration", "River Restoration", "Restoration of river ecosystems and natural flow"),
+        ("urban_greening", "Urban Greening", "Green infrastructure in urban environments"),
+        ("coastal_restoration", "Coastal Restoration", "Restoration of coastal and marine ecosystems"),
+    ]
+
+    for code, name, description in values:
+        await _upsert_by_code(db, NBSType, code, name, description)
+
+# ---------------------------------------------------------
+# Implementation Stages
+# ---------------------------------------------------------
+
+async def seed_implementation_stages(db: AsyncSession):
+    values = [
+        ("concept", "Concept", "Early stage idea or concept development"),
+        ("feasibility", "Feasibility", "Feasibility analysis and planning"),
+        ("pilot", "Pilot", "Small-scale pilot implementation"),
+        ("scaling", "Scaling", "Scaling up implementation"),
+        ("operational", "Operational", "Fully implemented and operational"),
+        ("maintenance", "Maintenance", "Ongoing maintenance and monitoring"),
+    ]
+
+    for code, name, description in values:
+        await _upsert_by_code(db, ImplementationStage, code, name, description)
+
+# ---------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------
 
@@ -152,5 +206,10 @@ async def seed_case_data_lookups(db: AsyncSession):
     await seed_use_of_proceeds_types(db)
     await seed_operator_specialties(db)
     await seed_countries(db)
+    await seed_financing_types(db)
+    await seed_nbs_types(db)
+    await seed_implementation_stages(db)
 
     await db.commit()
+
+

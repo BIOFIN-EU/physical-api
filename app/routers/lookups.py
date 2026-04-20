@@ -6,7 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Type
 
 from app.core.db import get_db
-from app.models.case_data import UseOfProceeds, OperatorSpecialty, Country
+from app.models.case_data import (
+    UseOfProceeds,
+    OperatorSpecialty,
+    Country,
+    FinancingType,
+    NBSType,
+    ImplementationStage,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,8 +23,13 @@ router = APIRouter()
 # 🔑 Map lookup keys → ORM models
 LOOKUP_MODELS: dict[str, Type] = {
     "use_of_proceeds": UseOfProceeds,
+    #todo check inconsistency
+    "operator_specialty": OperatorSpecialty,
     "operator_specialties": OperatorSpecialty,
-    "country": Country
+    "country": Country,
+    "financing_type": FinancingType,
+    "nbs_type": NBSType,
+    "implementation_stage": ImplementationStage,
 }
 
 

@@ -235,3 +235,245 @@ class CountryRead(ORMBaseSchema):
     id: int
     code: str
     name: str
+
+
+# ---------------------------------------------------------
+# CaseBasicInfo
+# ---------------------------------------------------------
+
+class CaseBasicInfoBase(BaseModel):
+    case_id: int
+    use_case_name: str = Field(..., max_length=255)
+    high_level_description: str
+
+
+class CaseBasicInfoCreate(CaseBasicInfoBase):
+    pass
+
+
+class CaseBasicInfoUpdate(BaseModel):
+    use_case_name: Optional[str] = Field(None, max_length=255)
+    high_level_description: Optional[str] = None
+
+
+class CaseBasicInfoRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    use_case_name: str
+    high_level_description: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------
+# FinancingType lookup
+# ---------------------------------------------------------
+
+class FinancingTypeBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class FinancingTypeCreate(FinancingTypeBase):
+    pass
+
+
+class FinancingTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class FinancingTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# CaseFinancingType
+# ---------------------------------------------------------
+
+class CaseFinancingTypeBase(BaseModel):
+    case_id: int
+    financing_type_id: int
+
+
+class CaseFinancingTypeCreate(CaseFinancingTypeBase):
+    pass
+
+
+class CaseFinancingTypeUpdate(BaseModel):
+    financing_type_id: Optional[int] = None
+
+
+class CaseFinancingTypeRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    financing_type_id: int
+    financing_type_name: Optional[str] = None
+    created_at: datetime
+
+
+# ---------------------------------------------------------
+# NBSType lookup
+# ---------------------------------------------------------
+
+
+class NBSTypeBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class NBSTypeCreate(NBSTypeBase):
+    pass
+
+
+class NBSTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class NBSTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# ImplementationStage lookup
+# ---------------------------------------------------------
+
+class ImplementationStageBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class ImplementationStageCreate(ImplementationStageBase):
+    pass
+
+
+class ImplementationStageUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class ImplementationStageRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# CaseNatureBasedSolution
+# ---------------------------------------------------------
+
+class CaseNatureBasedSolutionBase(BaseModel):
+    case_id: int
+    nbs_type_id: int
+    implementation_stage_id: Optional[int] = None
+    nbs_description: Optional[str] = None
+
+
+class CaseNatureBasedSolutionCreate(CaseNatureBasedSolutionBase):
+    pass
+
+
+class CaseNatureBasedSolutionUpdate(BaseModel):
+    nbs_type_id: Optional[int] = None
+    implementation_stage_id: Optional[int] = None
+    nbs_description: Optional[str] = None
+
+
+class CaseNatureBasedSolutionRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    nbs_type_id: int
+    nbs_type_name: Optional[str] = None
+    implementation_stage_id: Optional[int] = None
+    implementation_stage_name: Optional[str] = None
+    nbs_description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------
+# CaseFundingRequirement
+# ---------------------------------------------------------
+
+class CaseFundingRequirementBase(BaseModel):
+    case_id: int
+    funding_amount: Optional[Decimal] = None
+    currency: str = Field(default="EUR", max_length=3)
+    upfront_costs: Optional[Decimal] = None
+    maintenance_costs: Optional[Decimal] = None
+    direct_funding_amount: Optional[Decimal] = None
+    indirect_funding_amount: Optional[Decimal] = None
+    funding_notes: Optional[str] = None
+
+
+class CaseFundingRequirementCreate(CaseFundingRequirementBase):
+    pass
+
+
+class CaseFundingRequirementUpdate(BaseModel):
+    funding_amount: Optional[Decimal] = None
+    currency: Optional[str] = Field(None, max_length=3)
+    upfront_costs: Optional[Decimal] = None
+    maintenance_costs: Optional[Decimal] = None
+    direct_funding_amount: Optional[Decimal] = None
+    indirect_funding_amount: Optional[Decimal] = None
+    funding_notes: Optional[str] = None
+
+
+class CaseFundingRequirementRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    funding_amount: Optional[Decimal] = None
+    currency: str
+    upfront_costs: Optional[Decimal] = None
+    maintenance_costs: Optional[Decimal] = None
+    direct_funding_amount: Optional[Decimal] = None
+    indirect_funding_amount: Optional[Decimal] = None
+    funding_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------
+# CaseInvestmentRationale
+# ---------------------------------------------------------
+
+class CaseInvestmentRationaleBase(BaseModel):
+    case_id: int
+    nature_positive_benefits: str
+    legislation_compliance: Optional[str] = None
+    additional_rationale: Optional[str] = None
+
+
+class CaseInvestmentRationaleCreate(CaseInvestmentRationaleBase):
+    pass
+
+
+class CaseInvestmentRationaleUpdate(BaseModel):
+    nature_positive_benefits: Optional[str] = None
+    legislation_compliance: Optional[str] = None
+    additional_rationale: Optional[str] = None
+
+
+class CaseInvestmentRationaleRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    nature_positive_benefits: str
+    legislation_compliance: Optional[str] = None
+    additional_rationale: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime

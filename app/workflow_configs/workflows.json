@@ -83,6 +83,8 @@
           "title": "Identifiers",
           "activity": "save_identifiers_step",
           "next": null,
+          "ui_mode": "form",
+          "submit_mode": "json",
           "fields": [
             {
               "name": "organic_farmer_number",
@@ -120,6 +122,8 @@
           "title": "Location",
           "activity": "save_location_step",
           "next": "supporting_document",
+          "ui_mode": "map_form",
+          "submit_mode": "json",
           "fields": [
             {
               "name": "polygon_wkt",
@@ -164,6 +168,191 @@
             {
               "name": "document_notes",
               "display_name": "Document Notes",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        }
+      }
+    },
+    "use_case_2_v1": {
+      "code": "use_case_2_v1",
+      "start_step": "basic_info",
+      "steps": {
+        "basic_info": {
+          "title": "Name and High Level Description",
+          "activity": "save_basic_info_step",
+          "next": "financing_type",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "use_case_name",
+              "display_name": "Use Case Name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "high_level_description",
+              "display_name": "High Level Description",
+              "type": "textarea",
+              "required": true
+            }
+          ]
+        },
+        "financing_type": {
+          "title": "Financing Type",
+          "activity": "save_financing_type_step",
+          "next": "location",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "financing_type_ids",
+              "display_name": "Financing Type",
+              "type": "multiselect",
+              "required": true,
+              "options_source": "financing_type"
+            }
+          ]
+        },
+        "location": {
+          "title": "Location",
+          "activity": "save_location_step",
+          "next": "nature_based_solution",
+          "ui_mode": "map_form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "polygon_wkt",
+              "display_name": "Polygon WKT",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "country_id",
+              "display_name": "Country",
+              "type": "select",
+              "required": true,
+              "options_source": "country"
+            },
+            {
+              "name": "region",
+              "display_name": "Region",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "notes",
+              "display_name": "Notes",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "nature_based_solution": {
+          "title": "Nature-Based Solution Information",
+          "activity": "save_nature_based_solution_step",
+          "next": "funding_requirements",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "nbs_type_id",
+              "display_name": "NBS Type",
+              "type": "select",
+              "required": true,
+              "options_source": "nbs_type"
+            },
+            {
+              "name": "implementation_stage_id",
+              "display_name": "Implementation Stage",
+              "type": "select",
+              "required": false,
+              "options_source": "implementation_stage"
+            },
+            {
+              "name": "nbs_description",
+              "display_name": "NBS Description",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "funding_requirements": {
+          "title": "Funding Requirements",
+          "activity": "save_funding_requirements_step",
+          "next": "investment_rationale",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "funding_amount",
+              "display_name": "Funding Amount",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "currency",
+              "display_name": "Currency",
+              "type": "text",
+              "required": true,
+              "default": "EUR"
+            },
+            {
+              "name": "upfront_costs",
+              "display_name": "Upfront Costs",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "maintenance_costs",
+              "display_name": "Maintenance Costs",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "direct_funding_amount",
+              "display_name": "Direct Funding",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "indirect_funding_amount",
+              "display_name": "Indirect Funding",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "funding_notes",
+              "display_name": "Funding Notes",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "investment_rationale": {
+          "title": "Rationale for Attracting Investment",
+          "activity": "save_investment_rationale_step",
+          "next": null,
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "nature_positive_benefits",
+              "display_name": "Nature Positive Benefits",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "legislation_compliance",
+              "display_name": "Legislation Adherence",
+              "type": "textarea",
+              "required": false
+            },
+            {
+              "name": "additional_rationale",
+              "display_name": "Additional Rationale",
               "type": "textarea",
               "required": false
             }
