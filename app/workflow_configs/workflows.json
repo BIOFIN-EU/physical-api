@@ -2,8 +2,29 @@
   "workflows": {
     "private_lending_v1": {
       "code": "private_lending_v1",
-      "start_step": "location",
+      "start_step": "basic_info",
       "steps": {
+        "basic_info": {
+          "title": "Name and High Level Description",
+          "activity": "save_basic_info_step",
+          "next": "location",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "use_case_name",
+              "display_name": "Use Case Name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "high_level_description",
+              "display_name": "High Level Description",
+              "type": "textarea",
+              "required": true
+            }
+          ]
+        },
         "location": {
           "title": "Location",
           "activity": "save_location_step",
@@ -116,8 +137,29 @@
     },
     "private_lending_with_document_v1": {
       "code": "private_lending_with_document_v1",
-      "start_step": "location",
+      "start_step": "basic_info",
       "steps": {
+        "basic_info": {
+          "title": "Name and High Level Description",
+          "activity": "save_basic_info_step",
+          "next": "location",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "use_case_name",
+              "display_name": "Use Case Name",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "high_level_description",
+              "display_name": "High Level Description",
+              "type": "textarea",
+              "required": true
+            }
+          ]
+        },
         "location": {
           "title": "Location",
           "activity": "save_location_step",
