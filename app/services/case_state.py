@@ -8,6 +8,7 @@ from typing import Any, Callable
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from app.services.workflow_config_service import WorkflowConfigService
 from app.models.case_data import (
     Case,
@@ -43,6 +44,25 @@ def orm_to_dict(obj: Any, exclude: set[str] | None = None) -> dict[str, Any]:
         if key in exclude:
             continue
         data[key] = to_json_value(getattr(obj, key))
+
+    return data
+
+
+def serialize_lookup(row: Any) -> dict[str, Any] | None:
+    if row is None:
+        return None
+
+    data = {
+        "id": row.id,
+        "code": row.code,
+        "name": row.name,
+    }
+
+    if hasattr(row, "description"):
+        data["description"] = row.description
+
+    if hasattr(row, "intervention_type"):
+        data["intervention_type"] = row.intervention_type
 
     return data
 
@@ -94,16 +114,7 @@ def serialize_financial(row: CaseFinancial) -> dict[str, Any]:
         },
     )
 
-    data["use_of_proceeds"] = (
-        {
-            "id": row.use_of_proceeds.id,
-            "code": row.use_of_proceeds.code,
-            "name": row.use_of_proceeds.name,
-            "description": row.use_of_proceeds.description,
-        }
-        if row.use_of_proceeds
-        else None
-    )
+    data["use_of_proceeds"] = serialize_lookup(row.use_of_proceeds)
 
     return data
 
@@ -120,16 +131,7 @@ def serialize_operator(row: Operator) -> dict[str, Any]:
         },
     )
 
-    data["operator_specialty"] = (
-        {
-            "id": row.operator_specialty.id,
-            "code": row.operator_specialty.code,
-            "name": row.operator_specialty.name,
-            "description": row.operator_specialty.description,
-        }
-        if row.operator_specialty
-        else None
-    )
+    data["operator_specialty"] = serialize_lookup(row.operator_specialty)
 
     return data
 
@@ -158,30 +160,19 @@ def serialize_nbs(row: CaseNatureBasedSolution) -> dict[str, Any]:
             "updated_at",
             "nbs_type_id",
             "implementation_stage_id",
+            "nbs_environment_type_id",
+            "nbs_approach_type_id",
+            "nbs_intervention_type_id",
+            "nbs_societal_challenge_type_id",
         },
     )
 
-    data["nbs_type"] = (
-        {
-            "id": row.nbs_type.id,
-            "code": row.nbs_type.code,
-            "name": row.nbs_type.name,
-            "description": row.nbs_type.description,
-        }
-        if row.nbs_type
-        else None
-    )
-
-    data["implementation_stage"] = (
-        {
-            "id": row.implementation_stage.id,
-            "code": row.implementation_stage.code,
-            "name": row.implementation_stage.name,
-            "description": row.implementation_stage.description,
-        }
-        if row.implementation_stage
-        else None
-    )
+    data["nbs_type"] = serialize_lookup(row.nbs_type)
+    data["implementation_stage"] = serialize_lookup(row.implementation_stage)
+    data["nbs_environment_type"] = serialize_lookup(row.nbs_environment_type)
+    data["nbs_approach_type"] = serialize_lookup(row.nbs_approach_type)
+    data["nbs_intervention_type"] = serialize_lookup(row.nbs_intervention_type)
+    data["nbs_societal_challenge_type"] = serialize_lookup(row.nbs_societal_challenge_type)
 
     return data
 
@@ -205,23 +196,14 @@ def serialize_financing_type(row: CaseFinancingType) -> dict[str, Any]:
         },
     )
 
-    data["financing_type"] = (
-        {
-            "id": row.financing_type.id,
-            "code": row.financing_type.code,
-            "name": row.financing_type.name,
-            "description": row.financing_type.description,
-        }
-        if row.financing_type
-        else None
-    )
+    data["financing_type"] = serialize_lookup(row.financing_type)
 
     return data
 
 
 def serialize_document(row: CaseDocument) -> dict[str, Any]:
     return {
-        "case_document_id": row.id,  # or row.case_document_id if that is your actual field
+        "case_document_id": row.id,
         "case_id": row.case_id,
         "step_code": row.step_code,
         "field_name": row.field_name,
@@ -273,6 +255,10 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         loader_options=(
             selectinload(CaseNatureBasedSolution.nbs_type),
             selectinload(CaseNatureBasedSolution.implementation_stage),
+            selectinload(CaseNatureBasedSolution.nbs_environment_type),
+            selectinload(CaseNatureBasedSolution.nbs_approach_type),
+            selectinload(CaseNatureBasedSolution.nbs_intervention_type),
+            selectinload(CaseNatureBasedSolution.nbs_societal_challenge_type),
         ),
     ),
     "funding_requirements": SectionConfig(
@@ -283,18 +269,17 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         model=CaseFinancingType,
         serializer=serialize_financing_type,
         loader_options=(selectinload(CaseFinancingType.financing_type),),
-    )
+    ),
 }
 
 
-# todo check if can be integrated into main db call
 async def fetch_section(
-        db: AsyncSession,
-        *,
-        model: type,
-        case_id: int,
-        many: bool,
-        loader_options: tuple[Any, ...] = (),
+    db: AsyncSession,
+    *,
+    model: type,
+    case_id: int,
+    many: bool,
+    loader_options: tuple[Any, ...] = (),
 ) -> Any:
     stmt = select(model).where(model.case_id == case_id)
 
@@ -318,8 +303,8 @@ def serialize_row(row: Any, cfg: SectionConfig) -> dict[str, Any]:
 
 
 async def build_case_payload(
-        db: AsyncSession,
-        case_id: int,
+    db: AsyncSession,
+    case_id: int,
 ) -> dict[str, Any] | None:
     case = await db.get(Case, case_id)
     if case is None:
@@ -369,7 +354,6 @@ async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
     )
 
     result = await db.execute(stmt)
-
     rows = result.all()
 
     return [
@@ -389,8 +373,8 @@ async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def get_case_workflow_config(
-        db: AsyncSession,
-        case_id: int,
+    db: AsyncSession,
+    case_id: int,
 ) -> dict[str, Any] | None:
     config_service = WorkflowConfigService()
 

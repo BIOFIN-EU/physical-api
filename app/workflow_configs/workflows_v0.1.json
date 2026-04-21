@@ -314,34 +314,6 @@
               "options_source": "implementation_stage"
             },
             {
-              "name": "nbs_environment_type_id",
-              "display_name": "NbS Environment Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_environment_type"
-            },
-            {
-              "name": "nbs_approach_type_id",
-              "display_name": "NbS Approach Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_approach_type"
-            },
-            {
-              "name": "nbs_intervention_type_id",
-              "display_name": "NbS Intervention Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_intervention_type"
-            },
-            {
-              "name": "nbs_societal_challenge_type_id",
-              "display_name": "NbS Societal Challenge Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_societal_challenge_type"
-            },
-            {
               "name": "nbs_description",
               "display_name": "NBS Description",
               "type": "textarea",

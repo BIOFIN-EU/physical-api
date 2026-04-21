@@ -1,7 +1,12 @@
 from decimal import Decimal
-from typing import Optional, Literal, Dict, Any
+from typing import Optional, Literal, Any
 
 from pydantic import BaseModel, Field
+
+
+class BasicInfoStepInput(BaseModel):
+    name: str
+    high_level_description: str
 
 
 class LocationStepInput(BaseModel):
@@ -26,6 +31,36 @@ class IdentifiersStepInput(BaseModel):
     registry_notes: Optional[str] = None
 
 
+class FinancingTypeStepInput(BaseModel):
+    financing_type_id: int
+
+
+class NatureBasedSolutionStepInput(BaseModel):
+    nbs_type_id: int
+    implementation_stage_id: Optional[int] = None
+    nbs_environment_type_id: Optional[int] = None
+    nbs_approach_type_id: Optional[int] = None
+    nbs_intervention_type_id: Optional[int] = None
+    nbs_societal_challenge_type_id: Optional[int] = None
+    nbs_description: Optional[str] = None
+
+
+class FundingRequirementsStepInput(BaseModel):
+    funding_amount: Optional[Decimal] = Field(default=None, max_digits=14, decimal_places=2)
+    currency: str = "EUR"
+    upfront_costs: Optional[Decimal] = Field(default=None, max_digits=14, decimal_places=2)
+    maintenance_costs: Optional[Decimal] = Field(default=None, max_digits=14, decimal_places=2)
+    direct_funding_amount: Optional[Decimal] = Field(default=None, max_digits=14, decimal_places=2)
+    indirect_funding_amount: Optional[Decimal] = Field(default=None, max_digits=14, decimal_places=2)
+    funding_notes: Optional[str] = None
+
+
+class InvestmentRationaleStepInput(BaseModel):
+    nature_positive_benefits: str
+    legislation_compliance: Optional[str] = None
+    additional_rationale: Optional[str] = None
+
+
 class WorkflowStateResponse(BaseModel):
     case_id: int
     temporal_workflow_id: str
@@ -33,33 +68,3 @@ class WorkflowStateResponse(BaseModel):
     current_step: Optional[str]
     status: Literal["draft", "in_progress", "completed", "failed"]
     screen: dict[str, Any]
-
-class BasicInfoStepInput(BaseModel):
-    name: str
-    high_level_description: str
-
-
-class FinancingTypeStepInput(BaseModel):
-    financing_type_id: int
-
-
-class NatureBasedSolutionStepInput(BaseModel):
-    nbs_type_id: int
-    implementation_stage_id: int | None = None
-    nbs_description: str | None = None
-
-
-class FundingRequirementsStepInput(BaseModel):
-    funding_amount: Decimal | None = None
-    currency: str = "EUR"
-    upfront_costs: Decimal | None = None
-    maintenance_costs: Decimal | None = None
-    direct_funding_amount: Decimal | None = None
-    indirect_funding_amount: Decimal | None = None
-    funding_notes: str | None = None
-
-
-class InvestmentRationaleStepInput(BaseModel):
-    nature_positive_benefits: str
-    legislation_compliance: str | None = None
-    additional_rationale: str | None = None

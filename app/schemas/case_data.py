@@ -65,6 +65,218 @@ class OperatorSpecialtyRead(ORMBaseSchema):
     description: Optional[str] = None
 
 
+class CountryBase(BaseModel):
+    code: str = Field(..., max_length=2)
+    name: str = Field(..., max_length=100)
+
+
+class CountryCreate(CountryBase):
+    pass
+
+
+class CountryUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=2)
+    name: Optional[str] = Field(None, max_length=100)
+
+
+class CountryRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+
+
+class FinancingTypeBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class FinancingTypeCreate(FinancingTypeBase):
+    pass
+
+
+class FinancingTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class FinancingTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+class NBSTypeBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class NBSTypeCreate(NBSTypeBase):
+    pass
+
+
+class NBSTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class NBSTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+class ImplementationStageBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+
+class ImplementationStageCreate(ImplementationStageBase):
+    pass
+
+
+class ImplementationStageUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+
+class ImplementationStageRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+class NbSEnvironmentTypeBase(BaseModel):
+    code: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+
+
+class NbSEnvironmentTypeCreate(NbSEnvironmentTypeBase):
+    pass
+
+
+class NbSEnvironmentTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+
+
+class NbSEnvironmentTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+class NbSApproachTypeBase(BaseModel):
+    code: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+
+
+class NbSApproachTypeCreate(NbSApproachTypeBase):
+    pass
+
+
+class NbSApproachTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+
+
+class NbSApproachTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+class NbSInterventionTypeBase(BaseModel):
+    code: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    intervention_type: str = Field(..., max_length=50)
+
+
+class NbSInterventionTypeCreate(NbSInterventionTypeBase):
+    pass
+
+
+class NbSInterventionTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    intervention_type: Optional[str] = Field(None, max_length=50)
+
+
+class NbSInterventionTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+    intervention_type: str
+
+
+class NbSSocietalChallengeTypeBase(BaseModel):
+    code: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+
+
+class NbSSocietalChallengeTypeCreate(NbSSocietalChallengeTypeBase):
+    pass
+
+
+class NbSSocietalChallengeTypeUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+
+
+class NbSSocietalChallengeTypeRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+
+
+# ---------------------------------------------------------
+# CaseBasicInfo
+# ---------------------------------------------------------
+
+class CaseBasicInfoBase(BaseModel):
+    case_id: int
+    name: str = Field(..., max_length=255)
+    high_level_description: str
+
+
+class CaseBasicInfoCreate(CaseBasicInfoBase):
+    pass
+
+
+class CaseBasicInfoUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    high_level_description: Optional[str] = None
+
+
+class CaseBasicInfoRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    name: str
+    high_level_description: str
+    created_at: datetime
+    updated_at: datetime
+
+
 # ---------------------------------------------------------
 # CaseLocation
 # ---------------------------------------------------------
@@ -98,6 +310,7 @@ class CaseLocationRead(ORMBaseSchema):
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
 
 # ---------------------------------------------------------
 # CaseFinancial
@@ -210,89 +423,6 @@ class OperatorRead(ORMBaseSchema):
 
 
 # ---------------------------------------------------------
-# Country
-# ---------------------------------------------------------
-
-# ---------------------------------------------------------
-# Lookup tables
-# ---------------------------------------------------------
-
-class CountryBase(BaseModel):
-    code: str = Field(..., max_length=2)
-    name: str = Field(..., max_length=100)
-
-
-class CountryCreate(CountryBase):
-    pass
-
-
-class CountryUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=2)
-    name: Optional[str] = Field(None, max_length=100)
-
-
-class CountryRead(ORMBaseSchema):
-    id: int
-    code: str
-    name: str
-
-
-# ---------------------------------------------------------
-# CaseBasicInfo
-# ---------------------------------------------------------
-
-class CaseBasicInfoBase(BaseModel):
-    case_id: int
-    name: str = Field(..., max_length=255)
-    high_level_description: str
-
-
-class CaseBasicInfoCreate(CaseBasicInfoBase):
-    pass
-
-
-class CaseBasicInfoUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=255)
-    high_level_description: Optional[str] = None
-
-
-class CaseBasicInfoRead(ORMBaseSchema):
-    id: int
-    case_id: int
-    name: str
-    high_level_description: str
-    created_at: datetime
-    updated_at: datetime
-
-
-# ---------------------------------------------------------
-# FinancingType lookup
-# ---------------------------------------------------------
-
-class FinancingTypeBase(BaseModel):
-    code: str = Field(..., max_length=50)
-    name: str = Field(..., max_length=100)
-    description: Optional[str] = None
-
-
-class FinancingTypeCreate(FinancingTypeBase):
-    pass
-
-
-class FinancingTypeUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = None
-
-
-class FinancingTypeRead(ORMBaseSchema):
-    id: int
-    code: str
-    name: str
-    description: Optional[str] = None
-
-
-# ---------------------------------------------------------
 # CaseFinancingType
 # ---------------------------------------------------------
 
@@ -318,61 +448,6 @@ class CaseFinancingTypeRead(ORMBaseSchema):
 
 
 # ---------------------------------------------------------
-# NBSType lookup
-# ---------------------------------------------------------
-
-
-class NBSTypeBase(BaseModel):
-    code: str = Field(..., max_length=50)
-    name: str = Field(..., max_length=100)
-    description: Optional[str] = None
-
-
-class NBSTypeCreate(NBSTypeBase):
-    pass
-
-
-class NBSTypeUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = None
-
-
-class NBSTypeRead(ORMBaseSchema):
-    id: int
-    code: str
-    name: str
-    description: Optional[str] = None
-
-
-# ---------------------------------------------------------
-# ImplementationStage lookup
-# ---------------------------------------------------------
-
-class ImplementationStageBase(BaseModel):
-    code: str = Field(..., max_length=50)
-    name: str = Field(..., max_length=100)
-    description: Optional[str] = None
-
-
-class ImplementationStageCreate(ImplementationStageBase):
-    pass
-
-
-class ImplementationStageUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = None
-
-
-class ImplementationStageRead(ORMBaseSchema):
-    id: int
-    code: str
-    name: str
-    description: Optional[str] = None
-
-
-# ---------------------------------------------------------
 # CaseNatureBasedSolution
 # ---------------------------------------------------------
 
@@ -380,6 +455,10 @@ class CaseNatureBasedSolutionBase(BaseModel):
     case_id: int
     nbs_type_id: int
     implementation_stage_id: Optional[int] = None
+    nbs_environment_type_id: Optional[int] = None
+    nbs_approach_type_id: Optional[int] = None
+    nbs_intervention_type_id: Optional[int] = None
+    nbs_societal_challenge_type_id: Optional[int] = None
     nbs_description: Optional[str] = None
 
 
@@ -390,6 +469,10 @@ class CaseNatureBasedSolutionCreate(CaseNatureBasedSolutionBase):
 class CaseNatureBasedSolutionUpdate(BaseModel):
     nbs_type_id: Optional[int] = None
     implementation_stage_id: Optional[int] = None
+    nbs_environment_type_id: Optional[int] = None
+    nbs_approach_type_id: Optional[int] = None
+    nbs_intervention_type_id: Optional[int] = None
+    nbs_societal_challenge_type_id: Optional[int] = None
     nbs_description: Optional[str] = None
 
 
@@ -400,6 +483,14 @@ class CaseNatureBasedSolutionRead(ORMBaseSchema):
     nbs_type_name: Optional[str] = None
     implementation_stage_id: Optional[int] = None
     implementation_stage_name: Optional[str] = None
+    nbs_environment_type_id: Optional[int] = None
+    nbs_environment_type_name: Optional[str] = None
+    nbs_approach_type_id: Optional[int] = None
+    nbs_approach_type_name: Optional[str] = None
+    nbs_intervention_type_id: Optional[int] = None
+    nbs_intervention_type_name: Optional[str] = None
+    nbs_societal_challenge_type_id: Optional[int] = None
+    nbs_societal_challenge_type_name: Optional[str] = None
     nbs_description: Optional[str] = None
     created_at: datetime
     updated_at: datetime

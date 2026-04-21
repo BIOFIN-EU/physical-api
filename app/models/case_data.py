@@ -417,6 +417,30 @@ class CaseNatureBasedSolution(Base):
     )
     implementation_stage: Mapped[Optional["ImplementationStage"]] = relationship()
 
+    nbs_environment_type_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_environment_types.id"),
+        nullable=True,
+    )
+    nbs_environment_type: Mapped[Optional["NbSEnvironmentType"]] = relationship()
+
+    nbs_approach_type_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_approach_types.id"),
+        nullable=True,
+    )
+    nbs_approach_type: Mapped[Optional["NbSApproachType"]] = relationship()
+
+    nbs_intervention_type_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_intervention_types.id"),
+        nullable=True,
+    )
+    nbs_intervention_type: Mapped[Optional["NbSInterventionType"]] = relationship()
+
+    nbs_societal_challenge_type_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_societal_challenge_types.id"),
+        nullable=True,
+    )
+    nbs_societal_challenge_type: Mapped[Optional["NbSSocietalChallengeType"]] = relationship()
+
     nbs_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -501,3 +525,63 @@ class CaseInvestmentRationale(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+# ---------------------------------------------------------
+# 6. NbS Environment Type lookup
+# ---------------------------------------------------------
+
+class NbSEnvironmentType(Base):
+    __tablename__ = "nbs_environment_types"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# ---------------------------------------------------------
+# 7. NbS Approach Type lookup
+# ---------------------------------------------------------
+
+class NbSApproachType(Base):
+    __tablename__ = "nbs_approach_types"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# ---------------------------------------------------------
+# 8. NbS Intervention Type lookup
+# ---------------------------------------------------------
+
+class NbSInterventionType(Base):
+    __tablename__ = "nbs_intervention_types"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    intervention_type: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+# ---------------------------------------------------------
+# 9. NbS Societal Challenge Type lookup
+# ---------------------------------------------------------
+
+class NbSSocietalChallengeType(Base):
+    __tablename__ = "nbs_societal_challenge_types"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

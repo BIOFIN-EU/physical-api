@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import create_engine, select, delete
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -399,6 +399,10 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
         if existing:
             existing.nbs_type_id = payload.nbs_type_id
             existing.implementation_stage_id = payload.implementation_stage_id
+            existing.nbs_environment_type_id = payload.nbs_environment_type_id
+            existing.nbs_approach_type_id = payload.nbs_approach_type_id
+            existing.nbs_intervention_type_id = payload.nbs_intervention_type_id
+            existing.nbs_societal_challenge_type_id = payload.nbs_societal_challenge_type_id
             existing.nbs_description = payload.nbs_description
         else:
             session.add(
@@ -406,6 +410,10 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
                     case_id=case_id,
                     nbs_type_id=payload.nbs_type_id,
                     implementation_stage_id=payload.implementation_stage_id,
+                    nbs_environment_type_id=payload.nbs_environment_type_id,
+                    nbs_approach_type_id=payload.nbs_approach_type_id,
+                    nbs_intervention_type_id=payload.nbs_intervention_type_id,
+                    nbs_societal_challenge_type_id=payload.nbs_societal_challenge_type_id,
                     nbs_description=payload.nbs_description,
                 )
             )
