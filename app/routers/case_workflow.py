@@ -19,6 +19,8 @@ from app.services.file_storage_service import store_upload
 from app.services.object_storage_service import get_presigned_download_url
 from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.workflow_runtime_service import WorkflowRuntimeService, WorkflowNotActiveError
+from app.services.case_step_edit_service import update_case_step_data
+
 
 logger = logging.getLogger(__name__)
 
@@ -433,6 +435,19 @@ async def submit_file_step(
     except WorkflowNotActiveError as exc:
         raise _map_workflow_not_active_error(exc, run)
 
+@router.patch("/cases/{case_id}/steps/{step_code}")
+async def edit_case_step(
+    case_id: int,
+    step_code: str,
+    payload: dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_case_step_data(
+        db,
+        case_id=case_id,
+        step_code=step_code,
+        payload=payload,
+    )
 
 @router.get("/cases/{case_id}/documents/{case_document_id}/download-url")
 async def get_document_download_url(
