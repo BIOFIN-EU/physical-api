@@ -42,6 +42,84 @@ class Case(Base):
     )
 
 
+class CaseUserAccess(Base):
+    __tablename__ = "case_user_access"
+    __table_args__ = (
+        UniqueConstraint("case_id", "user_id", name="uq_case_user_access_case_user"),
+        CheckConstraint(
+            "case_role IN ('borrower', 'funder', 'intermediary')",
+            name="ck_case_user_access_case_role",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+
+    case_role: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    can_view: Mapped[bool] = mapped_column(nullable=False, default=True)
+    can_update: Mapped[bool] = mapped_column(nullable=False, default=False)
+    can_delete: Mapped[bool] = mapped_column(nullable=False, default=False)
+    can_assign_users: Mapped[bool] = mapped_column(nullable=False, default=False)
+
+    is_owner: Mapped[bool] = mapped_column(nullable=False, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+class CaseAccessAuditLog(Base):
+    __tablename__ = "case_access_audit_logs"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    actor_user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+
+    target_user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
 # ---------------------------------------------------------
 # Basic Info
 # ---------------------------------------------------------

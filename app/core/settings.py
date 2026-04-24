@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "case-documents"
     MINIO_SECURE: bool = False
 
+    AUTH_CLIENT_ID: str = "api_physical"
+    AUTH_CLIENT_SECRET: str
+
 
     @property
     def database_url(self) -> str:

@@ -14,7 +14,6 @@ from app.core.exceptions import AppError
 
 from app.services.object_storage_service import ensure_bucket_exists
 
-import app.models.workflow
 
 setup_logging()
 logger = logging.getLogger(__name__)

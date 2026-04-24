@@ -3,7 +3,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
@@ -12,7 +12,7 @@ from temporalio.service import RPCError, RPCStatusCode
 from app.core.db import get_db
 from app.core.settings import settings
 from app.dependencies.gateway_identity import get_request_user_id
-from app.models.case_data import CaseDocument
+from app.models.case_data import CaseDocument, CaseUserAccess, CaseAccessAuditLog
 from app.models.workflow import CaseWorkflowRun
 from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
 from app.services.file_storage_service import store_upload
@@ -20,7 +20,10 @@ from app.services.object_storage_service import get_presigned_download_url
 from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.workflow_runtime_service import WorkflowRuntimeService, WorkflowNotActiveError
 from app.services.case_step_edit_service import update_case_step_data
-
+from app.dependencies.case_access import require_case_permission
+from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAccessRequest
+from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
+from app.services.auth_user_service import resolve_user_id_by_email
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +131,21 @@ async def start_case(
 
     case_id = int(temporal_workflow_id.replace("case-", ""))
 
+    db.add(
+        CaseUserAccess(
+            case_id=case_id,
+            user_id=user_id,
+            case_role="borrower",
+            is_owner=True,
+            can_view=True,
+            can_update=True,
+            can_delete=True,
+            can_assign_users=True,
+        )
+    )
+
+    await db.commit()
+
     return {
         "case_id": case_id,
         "temporal_workflow_id": temporal_workflow_id,
@@ -139,7 +157,9 @@ async def start_case(
 async def get_case_state(
     case_id: int,
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> dict:
+
     run = await _get_run_or_404(db, case_id)
 
     workflow_state: dict[str, Any] = {
@@ -187,6 +207,7 @@ async def submit_step(
     case_id: int,
     payload: dict,
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ) -> dict:
     logger.info("Received payload for case %s: %s", case_id, payload)
 
@@ -307,6 +328,7 @@ async def submit_file_step(
     field_name: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ) -> dict:
     run = await _get_run_or_404(db, case_id)
 
@@ -441,6 +463,7 @@ async def edit_case_step(
     step_code: str,
     payload: dict[str, Any],
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ):
     return await update_case_step_data(
         db,
@@ -454,6 +477,7 @@ async def get_document_download_url(
     case_id: int,
     case_document_id: int,
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> dict:
     result = await db.execute(
         select(CaseDocument).where(
@@ -488,6 +512,7 @@ async def get_document_download_url(
 async def list_case_documents(
     case_id: int,
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> list[dict]:
     result = await db.execute(
         select(CaseDocument).where(CaseDocument.case_id == case_id)
@@ -514,6 +539,7 @@ async def list_case_documents(
 async def get_case_data(
     case_id: int,
     db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> dict[str, Any]:
     payload = await build_case_payload(db=db, case_id=case_id)
 
@@ -536,3 +562,131 @@ async def get_cases(
 ) -> list[dict[str, Any]]:
     cases = await fetch_cases(db=db)
     return cases
+
+@router.post("/cases/{case_id}/users")
+async def add_case_user(
+    case_id: int,
+    payload: AssignCaseUserRequest,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
+    actor_user_id: UUID = Depends(get_request_user_id),
+):
+    resolved_user_id = await resolve_user_id_by_email(payload.email)
+
+    new_access = await create_case_user_access(
+        db=db,
+        case_id=case_id,
+        user_id=resolved_user_id,
+        actor_user_id=actor_user_id,
+        case_role=payload.case_role,
+        can_view=payload.can_view,
+        can_update=payload.can_update,
+        can_delete=payload.can_delete,
+        can_assign_users=payload.can_assign_users,
+    )
+
+
+@router.get("/cases/{case_id}/users")
+async def list_case_users(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
+):
+    result = await db.execute(
+        select(CaseUserAccess).where(
+            CaseUserAccess.case_id == case_id,
+        )
+    )
+
+    users = result.scalars().all()
+
+    return [
+        {
+            "id": user_access.id,
+            "case_id": user_access.case_id,
+            "user_id": user_access.user_id,
+            "case_role": user_access.case_role,
+            "is_owner": user_access.is_owner,
+            "can_view": user_access.can_view,
+            "can_update": user_access.can_update,
+            "can_delete": user_access.can_delete,
+            "can_assign_users": user_access.can_assign_users,
+        }
+        for user_access in users
+        ]
+
+
+@router.patch("/cases/{case_id}/users/{user_id}")
+async def update_case_user(
+    case_id: int,
+    user_id: UUID,
+    payload: UpdateCaseUserAccessRequest,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
+    actor_user_id: UUID = Depends(get_request_user_id),
+):
+    updated_access = await update_case_user_access(
+        db=db,
+        case_id=case_id,
+        user_id=user_id,
+        actor_user_id=actor_user_id,
+        case_role=payload.case_role,
+        can_view=payload.can_view,
+        can_update=payload.can_update,
+        can_delete=payload.can_delete,
+        can_assign_users=payload.can_assign_users,
+    )
+
+    return {
+        "id": updated_access.id,
+        "case_id": updated_access.case_id,
+        "user_id": updated_access.user_id,
+        "case_role": updated_access.case_role,
+        "is_owner": updated_access.is_owner,
+        "can_view": updated_access.can_view,
+        "can_update": updated_access.can_update,
+        "can_delete": updated_access.can_delete,
+        "can_assign_users": updated_access.can_assign_users,
+    }
+
+@router.delete("/cases/{case_id}/users/{user_id}", status_code=204)
+async def remove_case_user(
+    case_id: int,
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
+    actor_user_id: UUID = Depends(get_request_user_id),
+):
+    await delete_case_user_access(
+        db=db,
+        case_id=case_id,
+        user_id=user_id,
+        actor_user_id=actor_user_id,
+    )
+
+@router.get("/cases/{case_id}/access-audit")
+async def list_case_access_audit(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
+):
+    result = await db.execute(
+        select(CaseAccessAuditLog)
+        .where(CaseAccessAuditLog.case_id == case_id)
+        .order_by(CaseAccessAuditLog.created_at.desc())
+    )
+
+    logs = result.scalars().all()
+
+    return [
+        {
+            "id": log.id,
+            "case_id": log.case_id,
+            "actor_user_id": log.actor_user_id,
+            "target_user_id": log.target_user_id,
+            "action": log.action,
+            "details": log.details,
+            "created_at": log.created_at,
+        }
+        for log in logs
+    ]
