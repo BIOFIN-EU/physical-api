@@ -571,7 +571,10 @@ async def add_case_user(
     access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
     actor_user_id: UUID = Depends(get_request_user_id),
 ):
+    payload_json = payload.json()
+    logger.info("Received request to add user to case %s with payload: %s", case_id, payload_json)
     resolved_user_id = await resolve_user_id_by_email(payload.email)
+    logging.info("Resolved email %s to user ID %s", payload.email, resolved_user_id)
 
     new_access = await create_case_user_access(
         db=db,

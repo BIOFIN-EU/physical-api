@@ -181,4 +181,4 @@ async def create_case_access_audit_log(
     db.add(log)
     await db.flush()
 
-    return logok
+    return log

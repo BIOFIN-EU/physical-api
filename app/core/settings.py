@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "case-documents"
     MINIO_SECURE: bool = False
 
+    AUTH_URL: str
     AUTH_CLIENT_ID: str = "api_physical"
     AUTH_CLIENT_SECRET: str
 
