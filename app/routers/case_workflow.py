@@ -290,6 +290,7 @@ async def submit_step(
             new_status = state.get("status")
 
             if validation_errors:
+                logger.info("Validation errors for case %s: %s", case_id, validation_errors)
                 raise HTTPException(
                     status_code=422,
                     detail={
@@ -300,6 +301,13 @@ async def submit_step(
                 )
 
             if new_step != current_step or new_status != before_status:
+                logger.info(
+                    "Step or status changed for case %s: new_step=%s, new_status=%s",
+                    case_id,
+                    new_step,
+                    new_status,
+                    state
+                )
                 return {
                     "message": "Step submitted successfully",
                     "state": state,

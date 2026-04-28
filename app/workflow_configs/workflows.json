@@ -5,7 +5,7 @@
       "start_step": "basic_info",
       "steps": {
         "basic_info": {
-          "title": "Name and High Level Description",
+          "title": "Name and Description",
           "activity": "save_basic_info_step",
           "next": "location",
           "ui_mode": "form",
@@ -142,7 +142,7 @@
           "fields": [
             {
               "name": "nbs_type_id",
-              "display_name": "NBS Type",
+              "display_name": "NbS Type",
               "type": "select",
               "required": true,
               "options_source": "nbs_type"
@@ -197,7 +197,7 @@
       "start_step": "basic_info",
       "steps": {
         "basic_info": {
-          "title": "Name and High Level Description",
+          "title": "Name and Description",
           "activity": "save_basic_info_step",
           "next": "location",
           "ui_mode": "form",
@@ -211,7 +211,7 @@
             },
             {
               "name": "high_level_description",
-              "display_name": "High Level Description",
+              "display_name": "Description",
               "type": "textarea",
               "required": true
             }
@@ -258,7 +258,7 @@
       "start_step": "basic_info",
       "steps": {
         "basic_info": {
-          "title": "Name and High Level Description",
+          "title": "Name and Description",
           "activity": "save_basic_info_step",
           "next": "financing_type",
           "ui_mode": "form",
@@ -266,13 +266,13 @@
           "fields": [
             {
               "name": "name",
-              "display_name": "NbS Project Name",
+              "display_name": "Name",
               "type": "text",
               "required": true
             },
             {
               "name": "high_level_description",
-              "display_name": "High Level Description",
+              "display_name": "Description",
               "type": "textarea",
               "required": true
             }
@@ -337,7 +337,7 @@
           "fields": [
             {
               "name": "nbs_type_id",
-              "display_name": "NBS Type",
+              "display_name": "NbS Type",
               "type": "select",
               "required": true,
               "options_source": "nbs_type"
@@ -379,7 +379,7 @@
             },
             {
               "name": "nbs_description",
-              "display_name": "NBS Description",
+              "display_name": "NbS Description",
               "type": "textarea",
               "required": false
             }

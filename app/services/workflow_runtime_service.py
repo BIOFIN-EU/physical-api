@@ -22,9 +22,9 @@ class WorkflowRuntimeService:
         self.db = db
 
     async def start_workflow(
-        self,
-        workflow_code: str,
-        user_id: UUID,
+            self,
+            workflow_code: str,
+            user_id: UUID,
     ) -> str:
         config_service = WorkflowConfigService()
         workflow_config = config_service.get_workflow(workflow_code)
@@ -133,8 +133,8 @@ class WorkflowRuntimeService:
         return temporal_workflow_id
 
     async def _get_or_create_workflow_definition(
-        self,
-        workflow_code: str,
+            self,
+            workflow_code: str,
     ) -> WorkflowDefinition:
         workflow_definition = await self.db.scalar(
             select(WorkflowDefinition).where(
@@ -158,13 +158,13 @@ class WorkflowRuntimeService:
         return workflow_definition
 
     async def _upsert_case_workflow_run(
-        self,
-        case_id,
-        workflow_definition_id,
-        temporal_workflow_id: str,
-        temporal_run_id: str,
-        current_step: str,
-        status: str,
+            self,
+            case_id,
+            workflow_definition_id,
+            temporal_workflow_id: str,
+            temporal_run_id: str,
+            current_step: str,
+            status: str,
     ) -> None:
         existing_run = await self.db.scalar(
             select(CaseWorkflowRun).where(
