@@ -103,7 +103,7 @@
         "identifiers": {
           "title": "Identifiers",
           "activity": "save_identifiers_step",
-          "next": "nature_based_solution",
+          "next": null,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -128,63 +128,6 @@
             {
               "name": "registry_notes",
               "display_name": "Registry Notes",
-              "type": "textarea",
-              "required": false
-            }
-          ]
-        },
-        "nature_based_solution": {
-          "title": "Nature-Based Solution Information",
-          "activity": "save_nature_based_solution_step",
-          "next": null,
-          "ui_mode": "form",
-          "submit_mode": "json",
-          "fields": [
-            {
-              "name": "nbs_type_id",
-              "display_name": "NbS Type",
-              "type": "select",
-              "required": true,
-              "options_source": "nbs_type"
-            },
-            {
-              "name": "implementation_stage_id",
-              "display_name": "Implementation Stage",
-              "type": "select",
-              "required": false,
-              "options_source": "implementation_stage"
-            },
-            {
-              "name": "nbs_environment_type_id",
-              "display_name": "NbS Environment Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_environment_type"
-            },
-            {
-              "name": "nbs_approach_type_id",
-              "display_name": "NbS Approach Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_approach_type"
-            },
-            {
-              "name": "nbs_intervention_type_id",
-              "display_name": "NbS Intervention Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_intervention_type"
-            },
-            {
-              "name": "nbs_societal_challenge_type_id",
-              "display_name": "NbS Societal Challenge Type",
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_societal_challenge_type"
-            },
-            {
-              "name": "nbs_description",
-              "display_name": "NBS Description",
               "type": "textarea",
               "required": false
             }
@@ -226,7 +169,7 @@
           "fields": [
             {
               "name": "polygon_wkt",
-              "display_name": "Polygon WKT",
+              "display_name": "Farm location",
               "type": "textarea",
               "required": true
             },
