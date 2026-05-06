@@ -12,6 +12,7 @@ from app.models.case_data import (
     NbSApproachType,
     NbSInterventionType,
     NbSSocietalChallengeType,
+    IntermediaryFunction,
 )
 
 async def _upsert_by_code(
@@ -408,6 +409,70 @@ async def seed_nbs_societal_challenge_types(db: AsyncSession):
             name,  # description = name
         )
 
+
+# ---------------------------------------------------------
+# Intermediary Functions
+# ---------------------------------------------------------
+
+async def seed_intermediary_functions(db: AsyncSession):
+    values = [
+        (
+            "transaction_design_implementation",
+            "Transaction design and implementation",
+            "financial",
+        ),
+        (
+            "recruitment_capital_owners",
+            "Recruitment of capital owners",
+            "financial",
+        ),
+        (
+            "pooling_nbs_investment",
+            "Pooling of NbS investment",
+            "financial",
+        ),
+        (
+            "assessing_risk_business_risk_restoration",
+            "Assessing risk and business risk of restoration activity",
+            "financial",
+        ),
+        (
+            "training_nbs_providers",
+            "Training of NbS providers",
+            "biodiversity",
+        ),
+        (
+            "recruitment_contracting_nbs_providers",
+            "Recruitment and contracting with NbS Providers",
+            "biodiversity",
+        ),
+        (
+            "design_monitoring_approach",
+            "Design of monitoring approach",
+            "biodiversity",
+        ),
+        (
+            "coordination_restoration_activity",
+            "Coordination of Restoration Activity",
+            "biodiversity",
+        ),
+        (
+            "assessment_ecosystem_pressures_restoration_approach",
+            "Assessment of Ecosystem Pressures and Restoration Approach",
+            "biodiversity",
+        ),
+    ]
+
+    for code, name, function_category in values:
+        await _upsert_by_code(
+            db,
+            IntermediaryFunction,
+            code,
+            name,
+            name,
+            extra_fields={"function_category": function_category},
+        )
+
 # ---------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------
@@ -424,5 +489,7 @@ async def seed_case_data_lookups(db: AsyncSession):
     await seed_nbs_approach_types(db)
     await seed_nbs_intervention_types(db)
     await seed_nbs_societal_challenge_types(db)
+
+    await seed_intermediary_functions(db)
 
     await db.commit()

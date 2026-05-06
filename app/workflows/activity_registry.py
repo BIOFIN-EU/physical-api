@@ -8,6 +8,7 @@ from app.workflows.activities import (
     save_nature_based_solution_step,
     save_funding_requirements_step,
     save_investment_rationale_step,
+    save_intermediary_step,
 )
 
 ACTIVITY_REGISTRY = {
@@ -20,4 +21,5 @@ ACTIVITY_REGISTRY = {
     "save_nature_based_solution_step": save_nature_based_solution_step,
     "save_funding_requirements_step": save_funding_requirements_step,
     "save_investment_rationale_step": save_investment_rationale_step,
+    "save_intermediary_step": save_intermediary_step,
 }

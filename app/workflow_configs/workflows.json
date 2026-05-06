@@ -103,7 +103,7 @@
         "identifiers": {
           "title": "Identifiers",
           "activity": "save_identifiers_step",
-          "next": null,
+          "next": "intermediary",
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -132,7 +132,23 @@
               "required": false
             }
           ]
-        }
+        },
+        "intermediary": {
+            "title": "Assign Intermediary",
+            "activity": "save_intermediary_step",
+            "next": null,
+            "ui_mode": "form",
+            "submit_mode": "json",
+            "fields": [
+              {
+                "name": "intermediary_id",
+                "display_name": "Intermediary",
+                "type": "select",
+                "required": true,
+                "options_source": "intermediary"
+              }
+            ]
+          }
       }
     },
     "private_lending_with_document_v1": {

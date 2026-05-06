@@ -25,6 +25,8 @@ from app.models.case_data import (
     CaseNatureBasedSolution,
     CaseFundingRequirement,
     CaseInvestmentRationale,
+    CaseIntermediary,
+    Intermediary,
 )
 from app.schemas.case_workflow import (
     LocationStepInput,
@@ -35,6 +37,7 @@ from app.schemas.case_workflow import (
     NatureBasedSolutionStepInput,
     FundingRequirementsStepInput,
     InvestmentRationaleStepInput,
+    IntermediaryStepInput
 )
 
 
@@ -809,5 +812,60 @@ def save_supporting_document_step(case_id: int, data: dict) -> None:
                     notes=document_notes,
                 )
             )
+
+        _commit_or_raise(session)
+
+@activity.defn
+def save_intermediary_step(case_id: int, data: dict) -> None:
+    """
+    Assign an existing intermediary to a case during the workflow.
+
+    This does not create or update the intermediary master record.
+    It only links the selected intermediary to the current case.
+    """
+    payload = _parse_pydantic(IntermediaryStepInput, data)
+    _log_activity_payload("save_intermediary_step", case_id, payload)
+
+    if not isinstance(payload.intermediary_id, int) or payload.intermediary_id <= 0:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {
+                "intermediary_id": "Intermediary must be a valid positive integer."
+            },
+        )
+
+    with SessionLocal() as session:
+        _get_case_or_raise(session, case_id)
+
+        intermediary = session.execute(
+            select(Intermediary).where(
+                Intermediary.id == payload.intermediary_id
+            )
+        ).scalar_one_or_none()
+
+        if not intermediary:
+            _raise_validation_error(
+                "Please correct the highlighted fields.",
+                {
+                    "intermediary_id": "Selected intermediary does not exist."
+                },
+            )
+
+        existing = session.execute(
+            select(CaseIntermediary).where(
+                CaseIntermediary.case_id == case_id,
+                CaseIntermediary.intermediary_id == payload.intermediary_id,
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            return
+
+        session.add(
+            CaseIntermediary(
+                case_id=case_id,
+                intermediary_id=payload.intermediary_id,
+            )
+        )
 
         _commit_or_raise(session)

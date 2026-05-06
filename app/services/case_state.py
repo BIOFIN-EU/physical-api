@@ -22,6 +22,9 @@ from app.models.case_data import (
     CaseNatureBasedSolution,
     CaseFundingRequirement,
     CaseInvestmentRationale,
+    CaseIntermediary,
+    IntermediaryFunctionAssignment,
+    Intermediary,
 )
 
 
@@ -200,6 +203,30 @@ def serialize_financing_type(row: CaseFinancingType) -> dict[str, Any]:
 
     return data
 
+def serialize_intermediary(row: CaseIntermediary) -> dict[str, Any]:
+    data = orm_to_dict(
+        row,
+        exclude={
+            "id",
+            "case_id",
+            "created_at",
+            "updated_at",
+            "intermediary_id",
+        },
+    )
+
+    data["intermediary"] = (
+        {
+            "id": row.intermediary.id,
+            "code": f"intermediary_{row.intermediary.id}",
+            "name": row.intermediary.name,
+            "description": row.intermediary.notes,
+        }
+        if row.intermediary
+        else None
+    )
+
+    return data
 
 def serialize_document(row: CaseDocument) -> dict[str, Any]:
     return {
@@ -270,16 +297,26 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         serializer=serialize_financing_type,
         loader_options=(selectinload(CaseFinancingType.financing_type),),
     ),
+    "intermediary": SectionConfig(
+        model=CaseIntermediary,
+        many=False,
+        serializer=serialize_intermediary,
+        loader_options=(
+            selectinload(CaseIntermediary.intermediary)
+            .selectinload(Intermediary.functions)
+            .selectinload(IntermediaryFunctionAssignment.intermediary_function),
+        ),
+    ),
 }
 
 
 async def fetch_section(
-    db: AsyncSession,
-    *,
-    model: type,
-    case_id: int,
-    many: bool,
-    loader_options: tuple[Any, ...] = (),
+        db: AsyncSession,
+        *,
+        model: type,
+        case_id: int,
+        many: bool,
+        loader_options: tuple[Any, ...] = (),
 ) -> Any:
     stmt = select(model).where(model.case_id == case_id)
 
@@ -303,8 +340,8 @@ def serialize_row(row: Any, cfg: SectionConfig) -> dict[str, Any]:
 
 
 async def build_case_payload(
-    db: AsyncSession,
-    case_id: int,
+        db: AsyncSession,
+        case_id: int,
 ) -> dict[str, Any] | None:
     case = await db.get(Case, case_id)
     if case is None:
@@ -373,8 +410,8 @@ async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def get_case_workflow_config(
-    db: AsyncSession,
-    case_id: int,
+        db: AsyncSession,
+        case_id: int,
 ) -> dict[str, Any] | None:
     config_service = WorkflowConfigService()
 

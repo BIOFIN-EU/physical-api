@@ -568,3 +568,111 @@ class CaseInvestmentRationaleRead(ORMBaseSchema):
     additional_rationale: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+# ---------------------------------------------------------
+# Intermediary Function lookup
+# ---------------------------------------------------------
+
+class IntermediaryFunctionBase(BaseModel):
+    code: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    function_category: str = Field(..., max_length=50)
+
+
+class IntermediaryFunctionCreate(IntermediaryFunctionBase):
+    pass
+
+
+class IntermediaryFunctionUpdate(BaseModel):
+    code: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    function_category: Optional[str] = Field(None, max_length=50)
+
+
+class IntermediaryFunctionRead(ORMBaseSchema):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+    function_category: str
+
+
+# ---------------------------------------------------------
+# Intermediary Function Assignment
+# ---------------------------------------------------------
+
+class IntermediaryFunctionAssignmentRead(ORMBaseSchema):
+    id: int
+    intermediary_id: int
+    intermediary_function_id: int
+    intermediary_function_name: Optional[str] = None
+    intermediary_function_category: Optional[str] = None
+    created_at: datetime
+
+
+# ---------------------------------------------------------
+# Intermediary
+# ---------------------------------------------------------
+
+class IntermediaryBase(BaseModel):
+    name: str = Field(..., max_length=255)
+    address: Optional[str] = None
+    phone: Optional[str] = Field(None, max_length=100)
+    email: Optional[EmailStr] = None
+    contact_details: Optional[str] = None
+    notes: Optional[str] = None
+
+    # Multi-select of intermediary function IDs
+    function_ids: list[int] = Field(default_factory=list)
+
+
+class IntermediaryCreate(IntermediaryBase):
+    pass
+
+
+class IntermediaryUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    address: Optional[str] = None
+    phone: Optional[str] = Field(None, max_length=100)
+    email: Optional[EmailStr] = None
+    contact_details: Optional[str] = None
+    notes: Optional[str] = None
+
+    # If omitted => leave existing functions unchanged
+    # If [] => clear all functions
+    function_ids: Optional[list[int]] = None
+
+
+class IntermediaryRead(ORMBaseSchema):
+    id: int
+    name: str
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    contact_details: Optional[str] = None
+    notes: Optional[str] = None
+
+    functions: list[IntermediaryFunctionAssignmentRead] = Field(
+        default_factory=list
+    )
+
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------
+# Case Intermediary Assignment
+# ---------------------------------------------------------
+
+class CaseIntermediaryAssign(BaseModel):
+    intermediary_id: int
+
+
+class CaseIntermediaryRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    intermediary_id: int
+    intermediary_name: Optional[str] = None
+    created_at: datetime

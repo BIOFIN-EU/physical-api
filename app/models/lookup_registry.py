@@ -9,6 +9,8 @@ from app.models.case_data import (
     NbSApproachType,
     NbSInterventionType,
     NbSSocietalChallengeType,
+    Intermediary,
+    IntermediaryFunction,
 )
 
 LOOKUP_REGISTRY = {
@@ -22,4 +24,6 @@ LOOKUP_REGISTRY = {
     "nbs_approach_type": NbSApproachType,
     "nbs_intervention_type": NbSInterventionType,
     "nbs_societal_challenge_type": NbSSocietalChallengeType,
+    "intermediary": Intermediary,
+    "intermediary_function": IntermediaryFunction,
 }

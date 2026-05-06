@@ -560,6 +560,7 @@ async def get_case_data(
         raise HTTPException(status_code=404, detail="Case Workflow Config not found")
 
     payload["workflow_config"] = workflow_config
+    logger.info("Built payload for case %s: %s", case_id, payload)
 
     return payload
 

@@ -68,3 +68,6 @@ class WorkflowStateResponse(BaseModel):
     current_step: Optional[str]
     status: Literal["draft", "in_progress", "completed", "failed"]
     screen: dict[str, Any]
+
+class IntermediaryStepInput(BaseModel):
+    intermediary_id: int = Field(..., gt=0)

@@ -663,3 +663,130 @@ class NbSSocietalChallengeType(Base):
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# ---------------------------------------------------------
+# Intermediaries
+# ---------------------------------------------------------
+class IntermediaryFunction(Base):
+    __tablename__ = "intermediary_functions"
+    __table_args__ = (
+        CheckConstraint(
+            "function_category IN ('financial', 'biodiversity')",
+            name="ck_intermediary_functions_function_category",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    function_category: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+class Intermediary(Base):
+    __tablename__ = "intermediaries"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    functions: Mapped[list["IntermediaryFunctionAssignment"]] = relationship(
+        cascade="all, delete-orphan",
+        back_populates="intermediary",
+    )
+
+    case_intermediaries: Mapped[list["CaseIntermediary"]] = relationship(
+        cascade="all, delete-orphan",
+        back_populates="intermediary",
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class CaseIntermediary(Base):
+    __tablename__ = "case_intermediaries"
+    __table_args__ = (
+        UniqueConstraint(
+            "case_id",
+            "intermediary_id",
+            name="uq_case_intermediaries_case_intermediary",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    intermediary_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.intermediaries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    intermediary: Mapped["Intermediary"] = relationship(
+        back_populates="case_intermediaries"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class IntermediaryFunctionAssignment(Base):
+    __tablename__ = "intermediary_function_assignments"
+    __table_args__ = (
+        UniqueConstraint(
+            "intermediary_id",
+            "intermediary_function_id",
+            name="uq_intermediary_function_assignment",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    intermediary_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.intermediaries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    intermediary_function_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.intermediary_functions.id"),
+        nullable=False,
+    )
+
+    intermediary: Mapped["Intermediary"] = relationship(back_populates="functions")
+    intermediary_function: Mapped["IntermediaryFunction"] = relationship()
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
