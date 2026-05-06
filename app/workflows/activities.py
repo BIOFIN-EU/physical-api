@@ -27,6 +27,7 @@ from app.models.case_data import (
     CaseInvestmentRationale,
     CaseIntermediary,
     Intermediary,
+    IntermediaryFunction
 )
 from app.schemas.case_workflow import (
     LocationStepInput,
@@ -39,7 +40,6 @@ from app.schemas.case_workflow import (
     InvestmentRationaleStepInput,
     IntermediaryStepInput
 )
-
 
 # --- DB setup ---
 
@@ -61,8 +61,8 @@ SessionLocal = sessionmaker(
 # --- Error helpers ---
 
 def _raise_validation_error(
-    message: str,
-    field_errors: dict[str, str] | None = None,
+        message: str,
+        field_errors: dict[str, str] | None = None,
 ) -> None:
     """
     Raise a Temporal non-retryable validation error.
@@ -241,9 +241,9 @@ def _validate_non_empty_string(value: Any, field_name: str, display_name: str) -
 
 
 def _validate_non_empty_list_of_ints(
-    value: Any,
-    field_name: str,
-    display_name: str,
+        value: Any,
+        field_name: str,
+        display_name: str,
 ) -> None:
     """
     Validate that a value is a non-empty list containing only integers.
@@ -266,8 +266,8 @@ def _validate_non_empty_list_of_ints(
 
 
 def _validate_file_metadata(
-    supporting_document: Any,
-    field_name: str,
+        supporting_document: Any,
+        field_name: str,
 ) -> dict[str, Any]:
     """
     Validate uploaded supporting document metadata.
@@ -307,9 +307,9 @@ def _validate_file_metadata(
 
 
 def _validate_funding_breakdown(
-    funding_amount: Decimal | None,
-    direct_funding_amount: Decimal | None,
-    indirect_funding_amount: Decimal | None,
+        funding_amount: Decimal | None,
+        direct_funding_amount: Decimal | None,
+        indirect_funding_amount: Decimal | None,
 ) -> None:
     """
     Validate that total funding equals direct plus indirect funding.
@@ -318,9 +318,9 @@ def _validate_funding_breakdown(
     existing optional-field behavior.
     """
     if (
-        funding_amount is not None
-        and direct_funding_amount is not None
-        and indirect_funding_amount is not None
+            funding_amount is not None
+            and direct_funding_amount is not None
+            and indirect_funding_amount is not None
     ):
         if funding_amount != direct_funding_amount + indirect_funding_amount:
             _raise_validation_error(
@@ -725,9 +725,9 @@ def save_investment_rationale_step(case_id: int, data: dict) -> None:
 
 @activity.defn
 def update_run_state(
-    case_id: int,
-    current_step: str | None,
-    status: str,
+        case_id: int,
+        current_step: str | None,
+        status: str,
 ) -> None:
     """
     Update the case and workflow run status.
@@ -815,57 +815,81 @@ def save_supporting_document_step(case_id: int, data: dict) -> None:
 
         _commit_or_raise(session)
 
+
 @activity.defn
 def save_intermediary_step(case_id: int, data: dict) -> None:
     """
-    Assign an existing intermediary to a case during the workflow.
+    Save intermediary assignments for a case.
 
-    This does not create or update the intermediary master record.
-    It only links the selected intermediary to the current case.
+    Each assignment links:
+    - one case
+    - one intermediary
+    - one intermediary function
     """
     payload = _parse_pydantic(IntermediaryStepInput, data)
     _log_activity_payload("save_intermediary_step", case_id, payload)
 
-    if not isinstance(payload.intermediary_id, int) or payload.intermediary_id <= 0:
-        _raise_validation_error(
-            "Please correct the highlighted fields.",
-            {
-                "intermediary_id": "Intermediary must be a valid positive integer."
-            },
-        )
-
     with SessionLocal() as session:
         _get_case_or_raise(session, case_id)
 
-        intermediary = session.execute(
-            select(Intermediary).where(
-                Intermediary.id == payload.intermediary_id
-            )
-        ).scalar_one_or_none()
-
-        if not intermediary:
-            _raise_validation_error(
-                "Please correct the highlighted fields.",
-                {
-                    "intermediary_id": "Selected intermediary does not exist."
-                },
-            )
-
-        existing = session.execute(
-            select(CaseIntermediary).where(
-                CaseIntermediary.case_id == case_id,
-                CaseIntermediary.intermediary_id == payload.intermediary_id,
-            )
-        ).scalar_one_or_none()
-
-        if existing:
-            return
-
-        session.add(
-            CaseIntermediary(
-                case_id=case_id,
-                intermediary_id=payload.intermediary_id,
+        # Replace all existing intermediary assignments for this case
+        session.execute(
+            CaseIntermediary.__table__.delete().where(
+                CaseIntermediary.case_id == case_id
             )
         )
+
+        seen: set[tuple[int, int]] = set()
+
+        for assignment in payload.assignments:
+            key = (
+                assignment.intermediary_id,
+                assignment.intermediary_function_id,
+            )
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+
+            intermediary = session.execute(
+                select(Intermediary).where(
+                    Intermediary.id == assignment.intermediary_id
+                )
+            ).scalar_one_or_none()
+
+            if intermediary is None:
+                _raise_validation_error(
+                    "Please correct the highlighted fields.",
+                    {
+                        "assignments": (
+                            f"Intermediary {assignment.intermediary_id} does not exist."
+                        )
+                    },
+                )
+
+            intermediary_function = session.execute(
+                select(IntermediaryFunction).where(
+                    IntermediaryFunction.id == assignment.intermediary_function_id
+                )
+            ).scalar_one_or_none()
+
+            if intermediary_function is None:
+                _raise_validation_error(
+                    "Please correct the highlighted fields.",
+                    {
+                        "assignments": (
+                            "Selected intermediary function does not exist."
+                        )
+                    },
+                )
+
+            session.add(
+                CaseIntermediary(
+                    case_id=case_id,
+                    intermediary_id=assignment.intermediary_id,
+                    intermediary_function_id=assignment.intermediary_function_id,
+                )
+            )
 
         _commit_or_raise(session)

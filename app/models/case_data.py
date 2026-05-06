@@ -724,16 +724,22 @@ class Intermediary(Base):
 
 class CaseIntermediary(Base):
     __tablename__ = "case_intermediaries"
+
     __table_args__ = (
         UniqueConstraint(
             "case_id",
             "intermediary_id",
-            name="uq_case_intermediaries_case_intermediary",
+            "intermediary_function_id",
+            name="uq_case_intermediary_function",
         ),
         {"schema": CASE_DATA_SCHEMA},
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
 
     case_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
@@ -747,9 +753,18 @@ class CaseIntermediary(Base):
         index=True,
     )
 
-    intermediary: Mapped["Intermediary"] = relationship(
-        back_populates="case_intermediaries"
+    intermediary_function_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            f"{CASE_DATA_SCHEMA}.intermediary_functions.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
     )
+
+    intermediary: Mapped["Intermediary"] = relationship()
+
+    intermediary_function: Mapped["IntermediaryFunction"] = relationship()
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

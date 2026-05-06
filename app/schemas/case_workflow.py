@@ -69,5 +69,13 @@ class WorkflowStateResponse(BaseModel):
     status: Literal["draft", "in_progress", "completed", "failed"]
     screen: dict[str, Any]
 
-class IntermediaryStepInput(BaseModel):
+class IntermediaryAssignmentInput(BaseModel):
     intermediary_id: int = Field(..., gt=0)
+    intermediary_function_id: int = Field(..., gt=0)
+
+
+class IntermediaryStepInput(BaseModel):
+    assignments: list[IntermediaryAssignmentInput] = Field(
+        ...,
+        min_length=1,
+    )

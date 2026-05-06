@@ -134,21 +134,36 @@
           ]
         },
         "intermediary": {
-            "title": "Assign Intermediary",
-            "activity": "save_intermediary_step",
-            "next": null,
-            "ui_mode": "form",
-            "submit_mode": "json",
-            "fields": [
-              {
-                "name": "intermediary_id",
-                "display_name": "Intermediary",
-                "type": "select",
-                "required": true,
-                "options_source": "intermediary"
-              }
-            ]
-          }
+  "title": "Assign Intermediaries",
+  "activity": "save_intermediary_step",
+  "next": null,
+  "ui_mode": "assignment_table",
+  "submit_mode": "json",
+  "fields": [
+    {
+      "name": "assignments",
+      "display_name": "Intermediary Assignments",
+      "type": "assignment_table",
+      "required": true,
+      "row_fields": [
+        {
+          "name": "intermediary_id",
+          "display_name": "Intermediary",
+          "type": "select",
+          "required": true,
+          "options_source": "intermediary"
+        },
+        {
+          "name": "intermediary_function_id",
+          "display_name": "Function",
+          "type": "select",
+          "required": true,
+          "options_source": "intermediary_function"
+        }
+      ]
+    }
+  ]
+}
       }
     },
     "private_lending_with_document_v1": {

@@ -23,8 +23,7 @@ from app.models.case_data import (
     CaseFundingRequirement,
     CaseInvestmentRationale,
     CaseIntermediary,
-    IntermediaryFunctionAssignment,
-    Intermediary,
+    IntermediaryFunctionAssignment
 )
 
 
@@ -203,30 +202,22 @@ def serialize_financing_type(row: CaseFinancingType) -> dict[str, Any]:
 
     return data
 
+
 def serialize_intermediary(row: CaseIntermediary) -> dict[str, Any]:
-    data = orm_to_dict(
-        row,
-        exclude={
-            "id",
-            "case_id",
-            "created_at",
-            "updated_at",
-            "intermediary_id",
-        },
-    )
+    return {
+        "intermediary": (
+            {
+                "id": row.intermediary.id,
+                "code": f"intermediary_{row.intermediary.id}",
+                "name": row.intermediary.name,
+                "description": row.intermediary.notes,
+            }
+            if row.intermediary
+            else None
+        ),
+        "intermediary_function": serialize_lookup(row.intermediary_function),
+    }
 
-    data["intermediary"] = (
-        {
-            "id": row.intermediary.id,
-            "code": f"intermediary_{row.intermediary.id}",
-            "name": row.intermediary.name,
-            "description": row.intermediary.notes,
-        }
-        if row.intermediary
-        else None
-    )
-
-    return data
 
 def serialize_document(row: CaseDocument) -> dict[str, Any]:
     return {
@@ -297,14 +288,13 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         serializer=serialize_financing_type,
         loader_options=(selectinload(CaseFinancingType.financing_type),),
     ),
-    "intermediary": SectionConfig(
+    "intermediaries": SectionConfig(
         model=CaseIntermediary,
-        many=False,
+        many=True,
         serializer=serialize_intermediary,
         loader_options=(
-            selectinload(CaseIntermediary.intermediary)
-            .selectinload(Intermediary.functions)
-            .selectinload(IntermediaryFunctionAssignment.intermediary_function),
+            selectinload(CaseIntermediary.intermediary),
+            selectinload(CaseIntermediary.intermediary_function),
         ),
     ),
 }
