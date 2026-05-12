@@ -288,7 +288,7 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         serializer=serialize_financing_type,
         loader_options=(selectinload(CaseFinancingType.financing_type),),
     ),
-    "intermediaries": SectionConfig(
+    "intermediary": SectionConfig(
         model=CaseIntermediary,
         many=True,
         serializer=serialize_intermediary,
