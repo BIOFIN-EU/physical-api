@@ -11,17 +11,18 @@ from app.routers.endpoints import api_router
 from app.core.db import SessionLocal, init_db
 from app.core.seed_case_data_lookups import seed_case_data_lookups
 from app.core.exceptions import AppError
-
 from app.services.object_storage_service import ensure_bucket_exists
 
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
-ensure_bucket_exists()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_bucket_exists()
+
     await init_db()
 
     async with SessionLocal() as session:
