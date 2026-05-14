@@ -15,10 +15,7 @@ class Settings(BaseSettings):
 
     MINIO_ROOT_USER: str
     MINIO_ROOT_PASSWORD: str
-
     MINIO_ENDPOINT: str
-    MINIO_ACCESS_KEY: str
-    MINIO_SECRET_KEY: str
     MINIO_BUCKET: str = "case-documents"
     MINIO_SECURE: bool = False
 
