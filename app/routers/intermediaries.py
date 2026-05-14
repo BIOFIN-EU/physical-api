@@ -90,7 +90,7 @@ async def _validate_intermediary_function_ids(
 # ---------------------------------------------------------
 
 @router.post(
-    "/intermediaries",
+    "",
     response_model=IntermediaryRead,
     status_code=status.HTTP_201_CREATED,
 )
@@ -136,7 +136,7 @@ async def create_intermediary(
 
 
 @router.get(
-    "/intermediaries",
+    "",
     response_model=list[IntermediaryRead],
 )
 async def list_intermediaries(
@@ -159,7 +159,7 @@ async def list_intermediaries(
 
 
 @router.get(
-    "/intermediaries/{intermediary_id}",
+    "/{intermediary_id}",
     response_model=IntermediaryRead,
 )
 async def get_intermediary(
@@ -185,7 +185,7 @@ async def get_intermediary(
 
 
 @router.patch(
-    "/intermediaries/{intermediary_id}",
+    "/{intermediary_id}",
     response_model=IntermediaryRead,
 )
 async def update_intermediary(
@@ -244,7 +244,7 @@ async def update_intermediary(
 
 
 @router.delete(
-    "/intermediaries/{intermediary_id}",
+    "/{intermediary_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_intermediary(

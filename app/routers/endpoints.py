@@ -26,6 +26,3 @@ api_router.include_router(intermediaries.router,
                           tags=["Intermediaries"])
 
 
-api_router.include_router(lookups.router,
-                          prefix=f"{std_prefix}/lookups",
-                          tags=["Lookups"])
