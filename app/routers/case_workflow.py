@@ -568,8 +568,9 @@ async def get_case_data(
 @router.get("/cases")
 async def get_cases(
     db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
 ) -> list[dict[str, Any]]:
-    cases = await fetch_cases(db=db)
+    cases = await fetch_cases(db=db, user_id=user_id)
     return cases
 
 @router.post("/cases/{case_id}/users")

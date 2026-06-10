@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from datetime import datetime
 from typing import Any, Callable
+from uuid import UUID
 
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from app.services.workflow_config_service import WorkflowConfigService
 from app.models.case_data import (
     Case,
+    CaseUserAccess,
     Operator,
     CaseLocation,
     CaseFinancial,
@@ -371,13 +373,12 @@ async def build_case_payload(
     return payload
 
 
-async def fetch_cases(db: AsyncSession) -> list[dict[str, Any]]:
+async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
     stmt = (
         select(Case, CaseBasicInfo.name, CaseBasicInfo.high_level_description)
-        .outerjoin(
-            CaseBasicInfo,
-            CaseBasicInfo.case_id == Case.id
-        )
+        .join(CaseUserAccess, CaseUserAccess.case_id == Case.id)
+        .outerjoin(CaseBasicInfo, CaseBasicInfo.case_id == Case.id)
+        .where(CaseUserAccess.user_id == user_id)
     )
 
     result = await db.execute(stmt)
