@@ -893,3 +893,8 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
             )
 
         _commit_or_raise(session)
+
+
+@activity.defn
+def save_consent_step(case_id: int, data: dict) -> None:
+    pass

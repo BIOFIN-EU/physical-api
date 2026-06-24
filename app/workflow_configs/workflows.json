@@ -2,8 +2,35 @@
   "workflows": {
     "private_lending_v1": {
       "code": "private_lending_v1",
-      "start_step": "basic_info",
+      "start_step": "consent",
       "steps": {
+        "consent": {
+          "title": "Data Collection and Sharing",
+          "activity": "save_consent_step",
+          "next": "basic_info",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+              {
+                "name": "disclaimer_text",
+                "display_name": "Disclaimer",
+                "type": "content",
+                "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              },
+              {
+                "name": "disclaimer_acknowledged",
+                "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+                "type": "checkbox",
+                "required": true
+              },
+              {
+                "name": "allow_data_sharing",
+                "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+                "type": "checkbox",
+                "required": true
+              }
+            ]
+        },
         "basic_info": {
           "title": "Name and Description",
           "activity": "save_basic_info_step",
@@ -134,94 +161,33 @@
           ]
         },
         "intermediary": {
-  "title": "Assign Intermediaries",
-  "activity": "save_intermediary_step",
-  "next": null,
-  "ui_mode": "assignment_table",
-  "submit_mode": "json",
-  "fields": [
-    {
-      "name": "assignments",
-      "display_name": "Intermediary Assignments",
-      "type": "assignment_table",
-      "required": true,
-      "row_fields": [
-        {
-          "name": "intermediary_id",
-          "display_name": "Intermediary",
-          "type": "select",
-          "required": true,
-          "options_source": "intermediary"
-        },
-        {
-          "name": "intermediary_function_id",
-          "display_name": "Function",
-          "type": "select",
-          "required": true,
-          "options_source": "intermediary_function"
-        }
-      ]
-    }
-  ]
-}
-      }
-    },
-    "private_lending_with_document_v1": {
-      "code": "private_lending_with_document_v1",
-      "start_step": "basic_info",
-      "steps": {
-        "basic_info": {
-          "title": "Name and Description",
-          "activity": "save_basic_info_step",
-          "next": "location",
-          "ui_mode": "form",
-          "submit_mode": "json",
-          "fields": [
-            {
-              "name": "name",
-              "display_name": "NbS Project Name",
-              "type": "text",
-              "required": true
-            },
-            {
-              "name": "high_level_description",
-              "display_name": "Description",
-              "type": "textarea",
-              "required": true
-            }
-          ]
-        },
-        "location": {
-          "title": "Location",
-          "activity": "save_location_step",
+          "title": "Assign Intermediaries",
+          "activity": "save_intermediary_step",
           "next": null,
-          "ui_mode": "map_form",
+          "ui_mode": "assignment_table",
           "submit_mode": "json",
           "fields": [
             {
-              "name": "polygon_wkt",
-              "display_name": "Farm location",
-              "type": "textarea",
-              "required": true
-            },
-            {
-              "name": "country_id",
-              "display_name": "Country",
-              "type": "select",
+              "name": "assignments",
+              "display_name": "Intermediary Assignments",
+              "type": "assignment_table",
               "required": true,
-              "options_source": "country"
-            },
-            {
-              "name": "region",
-              "display_name": "Region",
-              "type": "text",
-              "required": false
-            },
-            {
-              "name": "notes",
-              "display_name": "Notes",
-              "type": "textarea",
-              "required": false
+              "row_fields": [
+                {
+                  "name": "intermediary_id",
+                  "display_name": "Intermediary",
+                  "type": "select",
+                  "required": true,
+                  "options_source": "intermediary"
+                },
+                {
+                  "name": "intermediary_function_id",
+                  "display_name": "Function",
+                  "type": "select",
+                  "required": true,
+                  "options_source": "intermediary_function"
+                }
+              ]
             }
           ]
         }
@@ -229,8 +195,35 @@
     },
     "use_case_2_v1": {
       "code": "use_case_2_v1",
-      "start_step": "basic_info",
+      "start_step": "consent",
       "steps": {
+        "consent": {
+          "title": "Data Collection and Sharing",
+          "activity": "save_consent_step",
+          "next": "basic_info",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+              {
+                "name": "disclaimer_text",
+                "display_name": "Disclaimer",
+                "type": "content",
+                "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              },
+              {
+                "name": "disclaimer_acknowledged",
+                "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+                "type": "checkbox",
+                "required": true
+              },
+              {
+                "name": "allow_data_sharing",
+                "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+                "type": "checkbox",
+                "required": true
+              }
+            ]
+        },
         "basic_info": {
           "title": "Name and Description",
           "activity": "save_basic_info_step",
