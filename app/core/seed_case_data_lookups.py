@@ -5,6 +5,7 @@ from app.models.case_data import (
     UseOfProceeds,
     OperatorSpecialty,
     Country,
+    Currency,
     FinancingType,
     NBSType,
     ImplementationStage,
@@ -155,6 +156,41 @@ async def seed_countries(db: AsyncSession):
             Country,
             country["code"],
             country["name"],
+        )
+
+# ---------------------------------------------------------
+# Currencies (European only)
+# ---------------------------------------------------------
+
+async def seed_currencies(db: AsyncSession):
+    currencies = [
+        {"code": "EUR", "name": "Euro"},
+        {"code": "GBP", "name": "British Pound"},
+        {"code": "CHF", "name": "Swiss Franc"},
+        {"code": "NOK", "name": "Norwegian Krone"},
+        {"code": "SEK", "name": "Swedish Krona"},
+        {"code": "DKK", "name": "Danish Krone"},
+        {"code": "ISK", "name": "Icelandic Krona"},
+        {"code": "PLN", "name": "Polish Zloty"},
+        {"code": "CZK", "name": "Czech Koruna"},
+        {"code": "HUF", "name": "Hungarian Forint"},
+        {"code": "RON", "name": "Romanian Leu"},
+        {"code": "BGN", "name": "Bulgarian Lev"},
+        {"code": "RSD", "name": "Serbian Dinar"},
+        {"code": "MKD", "name": "Macedonian Denar"},
+        {"code": "ALL", "name": "Albanian Lek"},
+        {"code": "BAM", "name": "Bosnia-Herzegovina Convertible Mark"},
+        {"code": "MDL", "name": "Moldovan Leu"},
+        {"code": "UAH", "name": "Ukrainian Hryvnia"},
+        {"code": "BYN", "name": "Belarusian Ruble"},
+    ]
+
+    for currency in currencies:
+        await _upsert_by_code(
+            db,
+            Currency,
+            currency["code"],
+            currency["name"],
         )
 
 # ---------------------------------------------------------
@@ -482,6 +518,7 @@ async def seed_case_data_lookups(db: AsyncSession):
     await seed_use_of_proceeds_types(db)
     await seed_operator_specialties(db)
     await seed_countries(db)
+    await seed_currencies(db)
     await seed_financing_types(db)
     await seed_nbs_types(db)
     await seed_implementation_stages(db)

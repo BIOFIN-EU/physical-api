@@ -431,6 +431,18 @@ class Country(Base):
 # 2. Financing Type lookup
 # ---------------------------------------------------------
 
+class Currency(Base):
+    __tablename__ = "currencies"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
+
+    code: Mapped[str] = mapped_column(String(3), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+# ---------------------------------------------------------
+
 class FinancingType(Base):
     __tablename__ = "financing_types"
     __table_args__ = {"schema": CASE_DATA_SCHEMA}

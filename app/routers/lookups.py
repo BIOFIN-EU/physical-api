@@ -25,8 +25,15 @@ async def get_lookup(lookup_key: str, db: AsyncSession = Depends(get_db)):
 
     response = []
     for row in rows:
+        # "currency" is the one lookup whose referencing field stores the
+        # code itself (a plain String(3) column, e.g. CaseFinancial.currency)
+        # rather than a foreign key to this table's row id, so its dropdown
+        # value must be the code - every other lookup key is a real FK and
+        # keeps using the row id.
+        value = row.code if lookup_key == "currency" else str(row.id)
+
         item = {
-            "value": str(row.id),
+            "value": value,
             "label": row.name,
         }
 

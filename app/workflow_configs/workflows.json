@@ -84,9 +84,10 @@
             {
               "name": "currency",
               "display_name": "Currency",
-              "type": "text",
+              "type": "select",
               "required": true,
-              "default": "EUR"
+              "default": "EUR",
+              "options_source": "currency"
             },
             {
               "name": "use_of_proceeds_id",
@@ -332,9 +333,10 @@
             {
               "name": "currency",
               "display_name": "Currency",
-              "type": "text",
+              "type": "select",
               "required": true,
-              "default": "EUR"
+              "default": "EUR",
+              "options_source": "currency"
             },
             {
               "name": "upfront_costs",
