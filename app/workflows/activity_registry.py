@@ -9,7 +9,8 @@ from app.workflows.activities import (
     save_funding_requirements_step,
     save_investment_rationale_step,
     save_intermediary_step,
-    save_consent_step
+    save_consent_step,
+    clear_step_draft
 )
 
 ACTIVITY_REGISTRY = {
@@ -23,5 +24,9 @@ ACTIVITY_REGISTRY = {
     "save_funding_requirements_step": save_funding_requirements_step,
     "save_investment_rationale_step": save_investment_rationale_step,
     "save_intermediary_step": save_intermediary_step,
-    "save_consent_step": save_consent_step
+    "save_consent_step": save_consent_step,
+    # Not driven by any step's "activity" config value - registered here only
+    # so it rides along with ACTIVITY_REGISTRY.values() into the Temporal
+    # Worker's activities list (see app/workers/temporal_worker.py).
+    "clear_step_draft": clear_step_draft
 }

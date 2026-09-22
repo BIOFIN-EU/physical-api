@@ -15,6 +15,7 @@ from app.models.case_data import (
     Case,
     CaseUserAccess,
     Operator,
+    CaseConsent,
     CaseLocation,
     CaseFinancial,
     CaseIdentifiers,
@@ -146,6 +147,13 @@ def serialize_operator(row: Operator) -> dict[str, Any]:
     return data
 
 
+def serialize_consent(row: CaseConsent) -> dict[str, Any]:
+    return orm_to_dict(
+        row,
+        exclude={"id", "case_id", "created_at", "updated_at"},
+    )
+
+
 def serialize_basic_info(row: CaseBasicInfo) -> dict[str, Any]:
     return orm_to_dict(
         row,
@@ -267,6 +275,10 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         model=CaseDocument,
         many=True,
         serializer=serialize_document,
+    ),
+    "consent": SectionConfig(
+        model=CaseConsent,
+        serializer=serialize_consent,
     ),
     "basic_info": SectionConfig(
         model=CaseBasicInfo,

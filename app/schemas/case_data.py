@@ -250,6 +250,34 @@ class NbSSocietalChallengeTypeRead(ORMBaseSchema):
 
 
 # ---------------------------------------------------------
+# CaseConsent
+# ---------------------------------------------------------
+
+class CaseConsentBase(BaseModel):
+    case_id: int
+    disclaimer_acknowledged: bool
+    allow_data_sharing: bool
+
+
+class CaseConsentCreate(CaseConsentBase):
+    pass
+
+
+class CaseConsentUpdate(BaseModel):
+    disclaimer_acknowledged: Optional[bool] = None
+    allow_data_sharing: Optional[bool] = None
+
+
+class CaseConsentRead(ORMBaseSchema):
+    id: int
+    case_id: int
+    disclaimer_acknowledged: bool
+    allow_data_sharing: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------
 # CaseBasicInfo
 # ---------------------------------------------------------
 

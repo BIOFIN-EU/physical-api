@@ -123,6 +123,35 @@ class CaseAccessAuditLog(Base):
     )
 
 # ---------------------------------------------------------
+# Consent
+# ---------------------------------------------------------
+
+class CaseConsent(Base):
+    __tablename__ = "case_consents"
+    __table_args__ = (
+        UniqueConstraint("case_id", name="uq_case_consents_case_id"),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    disclaimer_acknowledged: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    allow_data_sharing: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------
 # Basic Info
 # ---------------------------------------------------------
 

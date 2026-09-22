@@ -10,7 +10,7 @@ from temporalio.exceptions import ActivityError, ApplicationError
 
 from app.schemas.workflow_runtime import WorkflowRuntimeInput
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
-from app.workflows.activities import update_run_state
+from app.workflows.activities import update_run_state, clear_step_draft
 
 
 DEFAULT_ACTIVITY_TIMEOUT = timedelta(seconds=30)
@@ -124,6 +124,15 @@ class ConfigDrivenCaseWorkflow:
                     self.system_error = str(exc)
                     await self._persist_state()
                     raise
+
+                # Committed data for this step supersedes any in-progress
+                # draft the user had saved for it while it was current.
+                await workflow.execute_activity(
+                    clear_step_draft,
+                    args=[self._require_case_id(), step_name],
+                    start_to_close_timeout=DEFAULT_ACTIVITY_TIMEOUT,
+                    retry_policy=DEFAULT_ACTIVITY_RETRY_POLICY,
+                )
 
                 next_step = step_config.get("next")
 

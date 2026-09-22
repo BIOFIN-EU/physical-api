@@ -4,6 +4,11 @@ from typing import Optional, Literal, Any
 from pydantic import BaseModel, Field, model_validator
 
 
+class ConsentStepInput(BaseModel):
+    disclaimer_acknowledged: bool
+    allow_data_sharing: bool
+
+
 class BasicInfoStepInput(BaseModel):
     name: str
     high_level_description: str

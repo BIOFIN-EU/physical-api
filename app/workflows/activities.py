@@ -14,8 +14,9 @@ from pydantic import ValidationError
 
 from app.core.settings import settings
 from app.models.case_data import Case, Country
-from app.models.workflow import CaseWorkflowRun
+from app.models.workflow import CaseWorkflowRun, CaseStepDraft
 from app.models.case_data import (
+    CaseConsent,
     CaseLocation,
     CaseFinancial,
     CaseIdentifiers,
@@ -30,6 +31,7 @@ from app.models.case_data import (
     IntermediaryFunction
 )
 from app.schemas.case_workflow import (
+    ConsentStepInput,
     LocationStepInput,
     LocationEntryInput,
     FinancialStepInput,
@@ -854,6 +856,29 @@ def update_run_state(
 
 
 @activity.defn
+def clear_step_draft(case_id: int, step_code: str) -> None:
+    """
+    Delete any saved draft for this (case_id, step_code), if one exists.
+
+    Called by the workflow immediately after a step's own activity succeeds
+    for a normal (non-edit) submission, since committed data supersedes an
+    in-progress draft. Safe to call when no draft row exists.
+    """
+    activity.logger.info(
+        "clear_step_draft for case %s, step_code=%s", case_id, step_code
+    )
+
+    with SessionLocal() as session:
+        session.execute(
+            CaseStepDraft.__table__.delete().where(
+                CaseStepDraft.case_id == case_id,
+                CaseStepDraft.step_code == step_code,
+            )
+        )
+        _commit_or_raise(session)
+
+
+@activity.defn
 def save_supporting_document_step(case_id: int, data: dict) -> None:
     """
     Save or update a supporting document reference for a workflow step.
@@ -997,4 +1022,27 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
 
 @activity.defn
 def save_consent_step(case_id: int, data: dict) -> None:
-    pass
+    """
+    Save or update the consent step for a case.
+    """
+    payload = _parse_pydantic(ConsentStepInput, data)
+    _log_activity_payload("save_consent_step", case_id, payload)
+
+    with SessionLocal() as session:
+        existing = session.execute(
+            select(CaseConsent).where(CaseConsent.case_id == case_id)
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.disclaimer_acknowledged = payload.disclaimer_acknowledged
+            existing.allow_data_sharing = payload.allow_data_sharing
+        else:
+            session.add(
+                CaseConsent(
+                    case_id=case_id,
+                    disclaimer_acknowledged=payload.disclaimer_acknowledged,
+                    allow_data_sharing=payload.allow_data_sharing,
+                )
+            )
+
+        _commit_or_raise(session)

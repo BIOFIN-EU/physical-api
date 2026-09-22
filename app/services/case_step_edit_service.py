@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.exceptions import ApplicationError
 
 from app.services.case_state import build_case_payload, get_case_workflow_config
+from app.services.case_step_draft_service import delete_case_step_draft
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
 
 
@@ -40,6 +41,17 @@ async def update_case_step_data(
             },
         )
 
+    if step_config.get("submit_mode") == "multipart":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "unsupported_step_type",
+                "message": (
+                    "This step must be edited via file upload, not this endpoint."
+                ),
+            },
+        )
+
     activity_name = step_config.get("activity")
     if not activity_name:
         raise HTTPException(
@@ -70,6 +82,9 @@ async def update_case_step_data(
                 "message": str(exc),
             },
         ) from exc
+
+    # Committed data supersedes any in-progress draft for this step.
+    await delete_case_step_draft(db, case_id=case_id, step_code=step_code)
 
     case_payload = await build_case_payload(db, case_id)
     if case_payload is None:

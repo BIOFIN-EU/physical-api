@@ -22,6 +22,8 @@ from app.services.object_storage_service import get_presigned_download_url
 from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.workflow_runtime_service import WorkflowRuntimeService, WorkflowNotActiveError
 from app.services.case_step_edit_service import update_case_step_data
+from app.services.case_step_draft_service import get_case_step_draft, upsert_case_step_draft
+from app.schemas.case_step_draft import CaseStepDraftRequest, CaseStepDraftResponse
 from app.dependencies.case_access import require_case_permission
 from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAccessRequest
 from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
@@ -537,6 +539,37 @@ async def edit_case_step(
         step_code=step_code,
         payload=payload,
     )
+
+
+@router.put("/cases/{case_id}/steps/{step_code}/draft", response_model=CaseStepDraftResponse)
+async def save_case_step_draft(
+    case_id: int,
+    step_code: str,
+    payload: CaseStepDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_update")),
+) -> dict[str, Any]:
+    return await upsert_case_step_draft(
+        db,
+        case_id=case_id,
+        step_code=step_code,
+        data=payload.data,
+    )
+
+
+@router.get("/cases/{case_id}/steps/{step_code}/draft", response_model=CaseStepDraftResponse)
+async def get_case_step_draft_endpoint(
+    case_id: int,
+    step_code: str,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
+) -> dict[str, Any]:
+    return await get_case_step_draft(
+        db,
+        case_id=case_id,
+        step_code=step_code,
+    )
+
 
 @router.get("/cases/{case_id}/documents/{case_document_id}/download-url")
 async def get_document_download_url(
