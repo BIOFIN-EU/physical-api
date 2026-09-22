@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 
 
 # ---------------------------------------------------------
@@ -283,9 +283,14 @@ class CaseBasicInfoRead(ORMBaseSchema):
 
 class CaseLocationBase(BaseModel):
     case_id: int
-    polygon_wkt: str
+    friendly_name: Optional[str] = Field(None, max_length=255)
+    location_type: Literal["polygon", "point"]
+    geometry_wkt: Optional[str] = None
     country_id: int
-    region: Optional[str] = Field(None, max_length=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    area_sqm: Optional[float] = None
+    area_is_manual: bool = False
     notes: Optional[str] = None
 
 
@@ -294,22 +299,39 @@ class CaseLocationCreate(CaseLocationBase):
 
 
 class CaseLocationUpdate(BaseModel):
-    polygon_wkt: Optional[str] = None
+    friendly_name: Optional[str] = Field(None, max_length=255)
+    location_type: Optional[Literal["polygon", "point"]] = None
+    geometry_wkt: Optional[str] = None
     country_id: Optional[int] = None
-    region: Optional[str] = Field(None, max_length=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    area_sqm: Optional[float] = None
+    area_is_manual: Optional[bool] = None
     notes: Optional[str] = None
 
 
 class CaseLocationRead(ORMBaseSchema):
     id: int
     case_id: int
-    polygon_wkt: str
+    friendly_name: Optional[str] = None
+    location_type: str
+    geometry_wkt: Optional[str] = None
     country_id: int
     country_name: Optional[str] = None
-    region: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    area_sqm: Optional[float] = None
+    area_is_manual: bool = False
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def area_hectares(self) -> Optional[float]:
+        if self.area_sqm is None:
+            return None
+        return self.area_sqm / 10000
 
 
 # ---------------------------------------------------------

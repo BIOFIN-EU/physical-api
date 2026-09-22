@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Optional, Literal, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class BasicInfoStepInput(BaseModel):
@@ -9,11 +9,72 @@ class BasicInfoStepInput(BaseModel):
     high_level_description: str
 
 
-class LocationStepInput(BaseModel):
-    polygon_wkt: str
-    country_id: int
-    region: Optional[str] = None
+class LocationEntryInput(BaseModel):
+    friendly_name: Optional[str] = None
+    location_type: Literal["polygon", "point"]
+    geometry_wkt: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    # Only meaningful for location_type == "point" (manual entry); ignored for polygon.
+    area_sqm: Optional[float] = None
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _validate_geometry_shape(self) -> "LocationEntryInput":
+        if self.location_type == "polygon":
+            if not self.geometry_wkt or not self.geometry_wkt.strip():
+                raise ValueError(
+                    "geometry_wkt is required for a polygon location."
+                )
+            if self.latitude is not None or self.longitude is not None:
+                raise ValueError(
+                    "latitude/longitude must not be provided for a polygon location."
+                )
+        elif self.location_type == "point":
+            if self.latitude is None or self.longitude is None:
+                raise ValueError(
+                    "latitude and longitude are both required for a point location."
+                )
+            if self.geometry_wkt is not None:
+                raise ValueError(
+                    "geometry_wkt must not be provided for a point location."
+                )
+
+        return self
+
+
+class LocationStepInput(BaseModel):
+    locations: list[LocationEntryInput] = Field(..., min_length=1)
+
+
+class DetectCountryRequest(BaseModel):
+    location_type: Literal["polygon", "point"]
+    geometry_wkt: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def _validate_geometry_shape(self) -> "DetectCountryRequest":
+        if self.location_type == "polygon":
+            if not self.geometry_wkt or not self.geometry_wkt.strip():
+                raise ValueError(
+                    "geometry_wkt is required for a polygon location."
+                )
+            if self.latitude is not None or self.longitude is not None:
+                raise ValueError(
+                    "latitude/longitude must not be provided for a polygon location."
+                )
+        elif self.location_type == "point":
+            if self.latitude is None or self.longitude is None:
+                raise ValueError(
+                    "latitude and longitude are both required for a point location."
+                )
+            if self.geometry_wkt is not None:
+                raise ValueError(
+                    "geometry_wkt must not be provided for a point location."
+                )
+
+        return self
 
 
 class FinancialStepInput(BaseModel):

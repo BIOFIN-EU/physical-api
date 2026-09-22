@@ -86,6 +86,12 @@ def serialize_location(row: CaseLocation) -> dict[str, Any]:
         exclude={"id", "case_id", "created_at", "updated_at", "country_id"},
     )
 
+    data["case_location_id"] = row.id
+
+    data["area_hectares"] = (
+        row.area_sqm / 10000 if row.area_sqm is not None else None
+    )
+
     data["country"] = (
         {
             "id": row.country.id,
@@ -238,6 +244,7 @@ def serialize_document(row: CaseDocument) -> dict[str, Any]:
 SECTION_CONFIG: dict[str, SectionConfig] = {
     "location": SectionConfig(
         model=CaseLocation,
+        many=True,
         loader_options=(selectinload(CaseLocation.country),),
         serializer=serialize_location,
     ),

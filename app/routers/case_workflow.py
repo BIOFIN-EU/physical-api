@@ -12,9 +12,11 @@ from temporalio.service import RPCError, RPCStatusCode
 from app.core.db import get_db
 from app.core.settings import settings
 from app.dependencies.gateway_identity import get_request_user_id
-from app.models.case_data import CaseDocument, CaseUserAccess, CaseAccessAuditLog
+from app.models.case_data import CaseDocument, CaseUserAccess, CaseAccessAuditLog, Country
 from app.models.workflow import CaseWorkflowRun
+from app.schemas.case_workflow import DetectCountryRequest
 from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
+from app.services.country_detection import build_geometry, detect_country_for_geometry
 from app.services.file_storage_service import store_upload
 from app.services.object_storage_service import get_presigned_download_url
 from app.services.workflow_config_service import WorkflowNotFoundError
@@ -464,6 +466,62 @@ async def submit_file_step(
 
     except WorkflowNotActiveError as exc:
         raise _map_workflow_not_active_error(exc, run)
+
+@router.post("/locations/detect-country")
+async def detect_country_for_location(
+    payload: DetectCountryRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Stateless helper: detect which seeded country a polygon or point geometry
+    falls within, without touching any case. Used by the location editor UI to
+    preview the auto-detected country before the step is submitted.
+    """
+    try:
+        geom = build_geometry(
+            geometry_wkt=payload.geometry_wkt,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_geometry",
+                "message": "The submitted geometry is not valid WKT.",
+            },
+        )
+
+    try:
+        iso_a2_code, is_multiple = detect_country_for_geometry(geom)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "no_country_match",
+                "message": str(exc),
+            },
+        )
+
+    result = await db.execute(select(Country).where(Country.code == iso_a2_code))
+    country = result.scalar_one_or_none()
+
+    if country is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "no_country_match",
+                "message": f"No seeded country found for detected code '{iso_a2_code}'.",
+            },
+        )
+
+    return {
+        "country_id": country.id,
+        "country_code": country.code,
+        "country_name": country.name,
+        "is_multiple": is_multiple,
+    }
+
 
 @router.patch("/cases/{case_id}/steps/{step_code}")
 async def edit_case_step(

@@ -146,6 +146,7 @@ async def seed_countries(db: AsyncSession):
         {"code": "GB", "name": "United Kingdom"},
         {"code": "VA", "name": "Vatican City"},
         {"code": "BR", "name": "Brazil"},
+        {"code": "XX", "name": "Multiple Countries"},
     ]
 
     for country in countries:

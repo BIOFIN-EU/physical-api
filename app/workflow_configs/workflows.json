@@ -56,33 +56,14 @@
           "title": "Location",
           "activity": "save_location_step",
           "next": "financial",
-          "ui_mode": "map_form",
+          "ui_mode": "location_table",
           "submit_mode": "json",
           "fields": [
             {
-              "name": "polygon_wkt",
-              "display_name": "Polygon WKT",
-              "type": "textarea",
+              "name": "locations",
+              "display_name": "Locations",
+              "type": "location_table",
               "required": true
-            },
-            {
-              "name": "country_id",
-              "display_name": "Country",
-              "type": "select",
-              "required": true,
-              "options_source": "country"
-            },
-            {
-              "name": "region",
-              "display_name": "Region",
-              "type": "text",
-              "required": false
-            },
-            {
-              "name": "notes",
-              "display_name": "Notes",
-              "type": "textarea",
-              "required": false
             }
           ]
         },
@@ -265,33 +246,14 @@
           "title": "Location",
           "activity": "save_location_step",
           "next": "nature_based_solution",
-          "ui_mode": "map_form",
+          "ui_mode": "location_table",
           "submit_mode": "json",
           "fields": [
             {
-              "name": "polygon_wkt",
-              "display_name": "Polygon WKT",
-              "type": "textarea",
+              "name": "locations",
+              "display_name": "Locations",
+              "type": "location_table",
               "required": true
-            },
-            {
-              "name": "country_id",
-              "display_name": "Country",
-              "type": "select",
-              "required": true,
-              "options_source": "country"
-            },
-            {
-              "name": "region",
-              "display_name": "Region",
-              "type": "text",
-              "required": false
-            },
-            {
-              "name": "notes",
-              "display_name": "Notes",
-              "type": "textarea",
-              "required": false
             }
           ]
         },

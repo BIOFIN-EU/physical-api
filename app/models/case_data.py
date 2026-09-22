@@ -5,8 +5,10 @@ from typing import Optional
 from decimal import Decimal
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
@@ -156,7 +158,6 @@ class CaseBasicInfo(Base):
 class CaseLocation(Base):
     __tablename__ = "case_locations"
     __table_args__ = (
-        UniqueConstraint("case_id", name="uq_case_locations_case_id"),
         {"schema": CASE_DATA_SCHEMA},
     )
 
@@ -167,7 +168,19 @@ class CaseLocation(Base):
         nullable=False,
     )
 
-    polygon_wkt: Mapped[str] = mapped_column(Text, nullable=False)
+    friendly_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Canonical geometry, either "POLYGON(...)" or "POINT(lon lat)".
+    geometry_wkt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    location_type: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Convenience read-side coordinates, populated only for location_type == "point".
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    area_sqm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    area_is_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     country_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.countries.id"),
@@ -175,7 +188,6 @@ class CaseLocation(Base):
     )
     country: Mapped["Country"] = relationship()
 
-    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

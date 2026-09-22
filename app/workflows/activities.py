@@ -13,7 +13,7 @@ from temporalio.exceptions import ApplicationError
 from pydantic import ValidationError
 
 from app.core.settings import settings
-from app.models.case_data import Case
+from app.models.case_data import Case, Country
 from app.models.workflow import CaseWorkflowRun
 from app.models.case_data import (
     CaseLocation,
@@ -31,6 +31,7 @@ from app.models.case_data import (
 )
 from app.schemas.case_workflow import (
     LocationStepInput,
+    LocationEntryInput,
     FinancialStepInput,
     IdentifiersStepInput,
     BasicInfoStepInput,
@@ -40,6 +41,15 @@ from app.schemas.case_workflow import (
     InvestmentRationaleStepInput,
     IntermediaryStepInput
 )
+# NOTE: shapely/pyproj/country_detection are deliberately NOT imported at
+# module level here. This module is reachable from the Temporal workflow
+# definition (ConfigDrivenCaseWorkflow -> activity_registry -> activities),
+# and Temporal's workflow sandbox re-imports that whole graph at worker
+# startup in a restricted environment that cannot load numpy's C extension
+# (a transitive dependency of shapely/pyproj) -> "cannot load module more
+# than once per process", crashing the worker. Activity code itself isn't
+# sandboxed, so importing these lazily inside the functions that use them
+# keeps the sandboxed import graph clean while working fine at call time.
 
 # --- DB setup ---
 
@@ -429,34 +439,124 @@ def _get_run_or_raise(session: Session, case_id: int) -> CaseWorkflowRun:
 
 # --- Activities ---
 
+def _resolve_location_country(session: Session, entry: LocationEntryInput) -> Country:
+    """
+    Detect and look up the Country row for a submitted location entry.
+
+    Country is always server-derived from the submitted geometry, never
+    client-settable.
+    """
+    from app.services.country_detection import build_geometry, detect_country_for_geometry
+
+    geom = build_geometry(
+        geometry_wkt=entry.geometry_wkt,
+        latitude=entry.latitude,
+        longitude=entry.longitude,
+    )
+
+    try:
+        iso_a2_code, _is_multiple = detect_country_for_geometry(geom)
+    except ValueError as exc:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {"locations": str(exc)},
+        )
+        return  # unreachable; keeps type-checkers happy
+
+    country = session.execute(
+        select(Country).where(Country.code == iso_a2_code)
+    ).scalar_one_or_none()
+
+    if country is None:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {
+                "locations": (
+                    f"No seeded country found for detected code '{iso_a2_code}'."
+                )
+            },
+        )
+
+    return country
+
+
+def _build_location_row(
+        case_id: int,
+        entry: LocationEntryInput,
+        country: Country,
+) -> CaseLocation:
+    """
+    Build a CaseLocation ORM row from a validated location entry, computing the
+    canonical geometry_wkt/area_sqm server-side.
+    """
+    if entry.location_type == "polygon":
+        import shapely.wkt
+        from pyproj import Geod
+
+        try:
+            polygon_geom = shapely.wkt.loads(entry.geometry_wkt)
+        except Exception:
+            _raise_validation_error(
+                "Please correct the highlighted fields.",
+                {"locations": "Invalid polygon geometry."},
+            )
+            return  # unreachable
+
+        geometry_wkt = shapely.wkt.dumps(polygon_geom)
+        area_sqm, _perimeter = Geod(ellps="WGS84").geometry_area_perimeter(polygon_geom)
+
+        return CaseLocation(
+            case_id=case_id,
+            friendly_name=entry.friendly_name,
+            location_type="polygon",
+            geometry_wkt=geometry_wkt,
+            latitude=None,
+            longitude=None,
+            area_sqm=abs(area_sqm),
+            area_is_manual=False,
+            country_id=country.id,
+            notes=entry.notes,
+        )
+
+    # location_type == "point"
+    return CaseLocation(
+        case_id=case_id,
+        friendly_name=entry.friendly_name,
+        location_type="point",
+        geometry_wkt=f"POINT({entry.longitude} {entry.latitude})",
+        latitude=entry.latitude,
+        longitude=entry.longitude,
+        area_sqm=entry.area_sqm,
+        area_is_manual=entry.area_sqm is not None,
+        country_id=country.id,
+        notes=entry.notes,
+    )
+
+
 @activity.defn
 def save_location_step(case_id: int, data: dict) -> None:
     """
-    Save or update the location step for a case.
+    Save the locations for a case.
+
+    Mirrors save_intermediary_step's delete-then-recreate pattern: all existing
+    location rows for this case are removed and replaced by the submitted list.
+    Country is always auto-detected server-side from each entry's geometry, and
+    is never accepted from the client.
     """
     payload = _parse_pydantic(LocationStepInput, data)
     _log_activity_payload("save_location_step", case_id, payload)
 
     with SessionLocal() as session:
-        existing = session.execute(
-            select(CaseLocation).where(CaseLocation.case_id == case_id)
-        ).scalar_one_or_none()
+        _get_case_or_raise(session, case_id)
 
-        if existing:
-            existing.polygon_wkt = payload.polygon_wkt
-            existing.country_id = payload.country_id
-            existing.region = payload.region
-            existing.notes = payload.notes
-        else:
-            session.add(
-                CaseLocation(
-                    case_id=case_id,
-                    polygon_wkt=payload.polygon_wkt,
-                    country_id=payload.country_id,
-                    region=payload.region,
-                    notes=payload.notes,
-                )
-            )
+        # Replace all existing locations for this case
+        session.execute(
+            CaseLocation.__table__.delete().where(CaseLocation.case_id == case_id)
+        )
+
+        for entry in payload.locations:
+            country = _resolve_location_country(session, entry)
+            session.add(_build_location_row(case_id, entry, country))
 
         _commit_or_raise(session)
 

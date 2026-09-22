@@ -21,6 +21,10 @@ asyncpg==0.31.0
 alembic==1.18.4
 psycopg[binary]
 
+# --- Geospatial ---
+shapely==2.1.2
+pyproj==3.7.2
+
 # --- Networking / HTTP ---
 httpx==0.28.1
 requests==2.32.3
