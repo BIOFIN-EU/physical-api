@@ -2,6 +2,7 @@
   "workflows": {
     "private_lending_v1": {
       "code": "private_lending_v1",
+      "name": "Private Lending",
       "start_step": "consent",
       "steps": {
         "consent": {
@@ -176,6 +177,7 @@
     },
     "use_case_2_v1": {
       "code": "use_case_2_v1",
+      "name": "Public / Private Financing",
       "start_step": "consent",
       "steps": {
         "consent": {

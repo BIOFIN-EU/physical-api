@@ -358,9 +358,12 @@ async def build_case_payload(
     if case is None:
         return None
 
+    workflows = WorkflowConfigService().load_all().get("workflows", {})
+
     payload: dict[str, Any] = {
         "caseId": case.id,
         "caseType": case.case_type,
+        "caseTypeName": workflows.get(case.case_type, {}).get("name", case.case_type),
         "status": case.status,
         "createdBy": str(case.created_by),
         "createdAt": to_json_value(case.created_at),
@@ -403,10 +406,13 @@ async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
     result = await db.execute(stmt)
     rows = result.all()
 
+    workflows = WorkflowConfigService().load_all().get("workflows", {})
+
     return [
         {
             "caseId": case.id,
             "caseType": case.case_type,
+            "caseTypeName": workflows.get(case.case_type, {}).get("name", case.case_type),
             "status": case.status,
             "name": name,
             "description": high_level_description,
