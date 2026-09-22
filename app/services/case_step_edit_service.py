@@ -10,6 +10,53 @@ from app.services.case_state import build_case_payload, get_case_workflow_config
 from app.services.case_step_draft_service import delete_case_step_draft
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
 
+# Mirrors ConfigDrivenCaseWorkflow._validate_required_fields /
+# _extract_validation_errors (app/workflows/case_workflow.py). Duplicated
+# here rather than imported, since that module is part of the Temporal
+# workflow sandbox's import graph and this one isn't - keeping this service
+# free of any import from app.workflows.case_workflow avoids ever having to
+# reason about sandbox reachability for this file.
+
+
+def _validate_required_fields(
+    step_config: dict[str, Any], payload: dict[str, Any]
+) -> dict[str, str]:
+    errors: dict[str, str] = {}
+    fields = step_config.get("fields", [])
+
+    if not isinstance(fields, list):
+        return {}
+
+    for field in fields:
+        if not isinstance(field, dict) or not field.get("required", False):
+            continue
+
+        name = field.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+
+        value = payload.get(name)
+
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            errors[name] = "This field is required"
+
+    return errors
+
+
+def _extract_field_errors(exc: ApplicationError) -> dict[str, str]:
+    details = list(exc.details)
+
+    if details and isinstance(details[0], dict):
+        first = details[0]
+
+        if all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in first.items()
+        ):
+            return first
+
+    return {"form": str(exc)}
+
 
 async def update_case_step_data(
     db: AsyncSession,
@@ -72,9 +119,28 @@ async def update_case_step_data(
             },
         )
 
+    required_field_errors = _validate_required_fields(step_config, payload)
+    if required_field_errors:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Validation failed",
+                "field_errors": required_field_errors,
+            },
+        )
+
     try:
         activity_fn(case_id, payload)
     except ApplicationError as exc:
+        if exc.type == "ValidationError":
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": str(exc),
+                    "field_errors": _extract_field_errors(exc),
+                },
+            ) from exc
+
         raise HTTPException(
             status_code=400,
             detail={
