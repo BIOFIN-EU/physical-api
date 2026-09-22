@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import status, case_workflow, lookups, intermediaries
+from app.routers import status, case_workflow, lookups, intermediaries, support
 
 
 api_router = APIRouter()
@@ -24,5 +24,9 @@ api_router.include_router(lookups.router,
 api_router.include_router(intermediaries.router,
                           prefix=f"{std_prefix}/intermediaries",
                           tags=["Intermediaries"])
+
+api_router.include_router(support.router,
+                          prefix=f"{std_prefix}/support",
+                          tags=["Support"])
 
 

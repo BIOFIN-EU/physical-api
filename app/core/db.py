@@ -46,5 +46,10 @@ async def init_db() -> None:
             text(f"CREATE SCHEMA IF NOT EXISTS {settings.CASE_DATA_DB_SCHEMA}")
         )
 
+        # Create schema if it does not exist
+        await conn.execute(
+            text("CREATE SCHEMA IF NOT EXISTS support")
+        )
+
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
