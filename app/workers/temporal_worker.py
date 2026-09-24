@@ -5,13 +5,14 @@ from concurrent.futures import ThreadPoolExecutor
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from app.workflows.case_workflow import ConfigDrivenCaseWorkflow
+from app.workflows.case_workflow import CaseLocationRiskWorkflow, ConfigDrivenCaseWorkflow
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
-from app.workflows.activities import update_run_state
+from app.workflows.activities import update_run_state, fetch_location_risk_ids
 
 activities = [
     *ACTIVITY_REGISTRY.values(),
     update_run_state,
+    fetch_location_risk_ids,
 ]
 
 TEMPORAL_ADDRESS = os.getenv("TEMPORAL_ADDRESS", "temporal:7233")
@@ -25,7 +26,7 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[ConfigDrivenCaseWorkflow],
+        workflows=[ConfigDrivenCaseWorkflow, CaseLocationRiskWorkflow],
         activities=activities,
         activity_executor=activity_executor,
     )

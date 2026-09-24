@@ -10,7 +10,7 @@ from temporalio.exceptions import ActivityError, ApplicationError
 
 from app.schemas.workflow_runtime import WorkflowRuntimeInput
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
-from app.workflows.activities import update_run_state, clear_step_draft
+from app.workflows.activities import update_run_state, clear_step_draft, fetch_location_risk_ids
 
 
 DEFAULT_ACTIVITY_TIMEOUT = timedelta(seconds=30)
@@ -24,6 +24,16 @@ DEFAULT_ACTIVITY_RETRY_POLICY = RetryPolicy(
         "NotFoundError",
         "ConfigurationError",
     ],
+)
+
+# Covers every polygon location of a case; each framework call can itself
+# take up to RISK_TIMEOUT_SECONDS when the result isn't cached yet.
+RISK_ACTIVITY_TIMEOUT = timedelta(hours=2)
+
+RISK_ACTIVITY_RETRY_POLICY = RetryPolicy(
+    initial_interval=timedelta(minutes=1),
+    maximum_interval=timedelta(minutes=10),
+    maximum_attempts=3,
 )
 
 
@@ -148,6 +158,9 @@ class ConfigDrivenCaseWorkflow:
 
                 await self._persist_state()
 
+            if self.status == "completed":
+                await self._fetch_location_risk_ids()
+
         except Exception as exc:
             if self.status != "failed":
                 self.status = "failed"
@@ -204,6 +217,26 @@ class ConfigDrivenCaseWorkflow:
             start_to_close_timeout=DEFAULT_ACTIVITY_TIMEOUT,
             retry_policy=DEFAULT_ACTIVITY_RETRY_POLICY,
         )
+
+    async def _fetch_location_risk_ids(self) -> None:
+        """
+        Store risk ids for the case's polygon locations once it completes.
+
+        Best effort: the case is already completed, so a Risk Score Framework
+        failure is only logged. Any location left without a risk_id gets one
+        on demand from GET /cases/{case_id}/risk.
+        """
+        try:
+            await workflow.execute_activity(
+                fetch_location_risk_ids,
+                args=[self._require_case_id()],
+                start_to_close_timeout=RISK_ACTIVITY_TIMEOUT,
+                retry_policy=RISK_ACTIVITY_RETRY_POLICY,
+            )
+        except ActivityError as exc:
+            workflow.logger.warning(
+                "Risk id fetch failed for case %s: %s", self.case_id, exc
+            )
 
     def _validate_runtime_config(self) -> None:
         """
@@ -352,4 +385,24 @@ class ConfigDrivenCaseWorkflow:
             message,
             type="ConfigurationError",
             non_retryable=True,
+        )
+
+
+@workflow.defn
+class CaseLocationRiskWorkflow:
+    """
+    Fetch missing risk ids for a case's locations outside the case workflow.
+
+    Started after the locations step is edited through the step edit
+    endpoint, which saves the data without going through
+    ConfigDrivenCaseWorkflow, so its completion-time fetch never runs again.
+    """
+
+    @workflow.run
+    async def run(self, case_id: int) -> None:
+        await workflow.execute_activity(
+            fetch_location_risk_ids,
+            args=[case_id],
+            start_to_close_timeout=RISK_ACTIVITY_TIMEOUT,
+            retry_policy=RISK_ACTIVITY_RETRY_POLICY,
         )

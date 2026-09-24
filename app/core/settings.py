@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     AUTH_CLIENT_ID: str = "api_physical"
     AUTH_CLIENT_SECRET: str
 
+    RISK_URL: str = "https://api.dev.biofindashboard.eu/api/vulnerability/"
+    # Priority calculations can take a long time when the framework has no
+    # cached result for a polygon yet.
+    RISK_TIMEOUT_SECONDS: float = 30 * 60
 
     @property
     def database_url(self) -> str:

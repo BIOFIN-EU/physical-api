@@ -3,9 +3,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.exc import DataError, IntegrityError, StatementError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -43,6 +43,7 @@ from app.schemas.case_workflow import (
     InvestmentRationaleStepInput,
     IntermediaryStepInput
 )
+from app.schemas.risk import LocationRiskInput
 # NOTE: shapely/pyproj/country_detection are deliberately NOT imported at
 # module level here. This module is reachable from the Temporal workflow
 # definition (ConfigDrivenCaseWorkflow -> activity_registry -> activities),
@@ -535,15 +536,35 @@ def _build_location_row(
     )
 
 
+def _apply_location_row(target: CaseLocation, submitted: CaseLocation) -> None:
+    """
+    Copy the editable fields of a freshly built row onto an existing row with
+    the same geometry. The existing row keeps its id and risk_id, unless the
+    detected country changed (the risk result depends on it).
+    """
+    if target.country_id != submitted.country_id:
+        target.risk_id = None
+
+    target.friendly_name = submitted.friendly_name
+    target.latitude = submitted.latitude
+    target.longitude = submitted.longitude
+    target.area_sqm = submitted.area_sqm
+    target.area_is_manual = submitted.area_is_manual
+    target.country_id = submitted.country_id
+    target.notes = submitted.notes
+
+
 @activity.defn
 def save_location_step(case_id: int, data: dict) -> None:
     """
     Save the locations for a case.
 
-    Mirrors save_intermediary_step's delete-then-recreate pattern: all existing
-    location rows for this case are removed and replaced by the submitted list.
-    Country is always auto-detected server-side from each entry's geometry, and
-    is never accepted from the client.
+    The submitted list is the full set of locations. The client doesn't send
+    row ids, so each entry is matched to an existing row by location_type and
+    canonical geometry_wkt: matches are updated in place (keeping their id and
+    risk_id), unmatched entries are inserted, and existing rows that weren't
+    submitted are deleted. Country is always auto-detected server-side from
+    each entry's geometry, and is never accepted from the client.
     """
     payload = _parse_pydantic(LocationStepInput, data)
     _log_activity_payload("save_location_step", case_id, payload)
@@ -551,14 +572,36 @@ def save_location_step(case_id: int, data: dict) -> None:
     with SessionLocal() as session:
         _get_case_or_raise(session, case_id)
 
-        # Replace all existing locations for this case
-        session.execute(
-            CaseLocation.__table__.delete().where(CaseLocation.case_id == case_id)
+        unmatched = list(
+            session.execute(
+                select(CaseLocation)
+                .where(CaseLocation.case_id == case_id)
+                .order_by(CaseLocation.id)
+            ).scalars().all()
         )
 
         for entry in payload.locations:
             country = _resolve_location_country(session, entry)
-            session.add(_build_location_row(case_id, entry, country))
+            submitted = _build_location_row(case_id, entry, country)
+
+            existing = next(
+                (
+                    row for row in unmatched
+                    if row.location_type == submitted.location_type
+                    and row.geometry_wkt == submitted.geometry_wkt
+                ),
+                None,
+            )
+
+            if existing is None:
+                session.add(submitted)
+                continue
+
+            unmatched.remove(existing)
+            _apply_location_row(existing, submitted)
+
+        for row in unmatched:
+            session.delete(row)
 
         _commit_or_raise(session)
 
@@ -876,6 +919,88 @@ def clear_step_draft(case_id: int, step_code: str) -> None:
             )
         )
         _commit_or_raise(session)
+
+
+def fill_missing_location_risk_ids(case_id: int, logger: Any) -> tuple[int, list[Exception]]:
+    """
+    Store a Risk Score Framework risk_id on every polygon location of a case
+    that doesn't have one yet. Returns (locations attempted, failures).
+
+    Point locations are skipped (the framework needs a polygon). Each id is
+    committed as soon as it is fetched, so calling this again only requests
+    the locations that are still missing. Shared by the
+    fetch_location_risk_ids activity and app.scripts.backfill_location_risk_ids.
+    """
+    from app.services.risk_framework_service import (
+        RiskFrameworkError,
+        get_id_from_risk_framework,
+    )
+
+    with SessionLocal() as session:
+        locations = session.execute(
+            select(CaseLocation)
+            .options(selectinload(CaseLocation.country))
+            .where(
+                CaseLocation.case_id == case_id,
+                CaseLocation.location_type == "polygon",
+                CaseLocation.risk_id.is_(None),
+            )
+            .order_by(CaseLocation.id)
+        ).scalars().all()
+
+        failures: list[RiskFrameworkError] = []
+
+        for location in locations:
+            try:
+                risk_id = get_id_from_risk_framework(
+                    LocationRiskInput(
+                        country_code=location.country.code,
+                        wkt_polygon=location.geometry_wkt,
+                    )
+                )
+            except RiskFrameworkError as exc:
+                logger.warning(
+                    "Risk id fetch failed for case %s location %s: %s",
+                    case_id,
+                    location.id,
+                    exc,
+                )
+                failures.append(exc)
+                continue
+
+            # A plain UPDATE rather than setting the attribute: the row may have
+            # been deleted by a locations edit during the (slow) framework call,
+            # which would make an ORM flush raise StaleDataError.
+            session.execute(
+                update(CaseLocation)
+                .where(CaseLocation.id == location.id, CaseLocation.risk_id.is_(None))
+                .values(risk_id=risk_id)
+                .execution_options(synchronize_session=False)
+            )
+            _commit_or_raise(session)
+
+    return len(locations), failures
+
+
+@activity.defn
+def fetch_location_risk_ids(case_id: int) -> None:
+    """
+    Fill missing risk ids for a case's polygon locations.
+
+    Run when the case workflow completes and after every edit of the
+    locations step (CaseLocationRiskWorkflow).
+    """
+    activity.logger.info("fetch_location_risk_ids for case %s", case_id)
+
+    attempted, failures = fill_missing_location_risk_ids(case_id, activity.logger)
+
+    if failures:
+        raise ApplicationError(
+            f"Could not fetch risk ids for {len(failures)} of {attempted} "
+            f"location(s) of case {case_id}.",
+            type="RiskFrameworkError",
+            non_retryable=not any(exc.retryable for exc in failures),
+        )
 
 
 @activity.defn

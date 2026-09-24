@@ -219,6 +219,10 @@ class CaseLocation(Base):
 
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Biodiversity Risk Index record id in the Risk Score Framework, only
+    # populated for polygon locations (see fetch_location_risk_ids).
+    risk_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

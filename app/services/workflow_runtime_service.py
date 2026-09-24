@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,26 @@ from app.services.workflow_config_service import WorkflowConfigService
 
 class WorkflowNotActiveError(Exception):
     pass
+
+
+async def start_location_risk_workflow(case_id: int) -> str:
+    """
+    Start CaseLocationRiskWorkflow for a case without waiting for it.
+
+    Each start gets a unique id so an edit made while a previous fetch is
+    still running gets its own run; the activity only fills rows that still
+    have no risk_id, so overlapping runs are harmless.
+    """
+    client = await Client.connect(settings.TEMPORAL_ADDRESS)
+
+    handle = await client.start_workflow(
+        "CaseLocationRiskWorkflow",
+        case_id,
+        id=f"case-{case_id}-location-risk-{uuid4()}",
+        task_queue=settings.TEMPORAL_TASK_QUEUE,
+    )
+
+    return handle.id
 
 
 class WorkflowRuntimeService:

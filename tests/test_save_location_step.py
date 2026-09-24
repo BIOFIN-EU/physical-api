@@ -79,6 +79,99 @@ def test_resubmitting_replaces_existing_locations(case_id):
     assert len(_locations_for_case(case_id)) == 2
 
 
+def _location_ids_and_risk(case_id: int) -> dict[str, tuple[int, str | None]]:
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(CaseLocation).where(CaseLocation.case_id == case_id)
+        ).scalars().all()
+        return {row.friendly_name: (row.id, row.risk_id) for row in rows}
+
+
+def _set_risk_id(case_id: int, friendly_name: str, risk_id: str) -> None:
+    with SessionLocal() as session:
+        row = session.execute(
+            select(CaseLocation).where(
+                CaseLocation.case_id == case_id,
+                CaseLocation.friendly_name == friendly_name,
+            )
+        ).scalar_one()
+        row.risk_id = risk_id
+        session.commit()
+
+
+BRUSSELS_POLYGON = (
+    "POLYGON((4.34 50.84, 4.36 50.84, 4.36 50.86, 4.34 50.86, 4.34 50.84))"
+)
+
+
+def test_resubmitting_keeps_unchanged_locations_and_risk_id(case_id):
+    save_location_step(
+        case_id,
+        {"locations": [{
+            "friendly_name": "Brussels",
+            "location_type": "polygon",
+            "geometry_wkt": BRUSSELS_POLYGON,
+        }]},
+    )
+    _set_risk_id(case_id, "Brussels", "risk-1")
+    original_id, _ = _location_ids_and_risk(case_id)["Brussels"]
+
+    # Same polygon (resubmitted as stored) plus a new location, and the
+    # unchanged one renamed.
+    with SessionLocal() as session:
+        stored_wkt = session.get(CaseLocation, original_id).geometry_wkt
+
+    save_location_step(
+        case_id,
+        {"locations": [
+            {
+                "friendly_name": "Brussels renamed",
+                "location_type": "polygon",
+                "geometry_wkt": stored_wkt,
+            },
+            {
+                "friendly_name": "Amsterdam",
+                "location_type": "point",
+                "latitude": 52.3676,
+                "longitude": 4.9041,
+            },
+        ]},
+    )
+
+    rows = _location_ids_and_risk(case_id)
+    assert rows["Brussels renamed"] == (original_id, "risk-1")
+    assert rows["Amsterdam"][1] is None
+    assert len(rows) == 2
+
+
+def test_resubmitting_drops_removed_and_changed_locations(case_id):
+    save_location_step(
+        case_id,
+        {"locations": [
+            {"friendly_name": "Brussels", "location_type": "polygon", "geometry_wkt": BRUSSELS_POLYGON},
+            {"friendly_name": "Amsterdam", "location_type": "point", "latitude": 52.3676, "longitude": 4.9041},
+        ]},
+    )
+    _set_risk_id(case_id, "Brussels", "risk-1")
+    original_id, _ = _location_ids_and_risk(case_id)["Brussels"]
+
+    moved_polygon = (
+        "POLYGON((4.35 50.84, 4.37 50.84, 4.37 50.86, 4.35 50.86, 4.35 50.84))"
+    )
+    save_location_step(
+        case_id,
+        {"locations": [
+            {"friendly_name": "Brussels", "location_type": "polygon", "geometry_wkt": moved_polygon},
+        ]},
+    )
+
+    rows = _location_ids_and_risk(case_id)
+    assert list(rows) == ["Brussels"]
+    new_id, risk_id = rows["Brussels"]
+    assert new_id != original_id
+    assert risk_id is None
+
+
 def test_polygon_straddling_border_detects_multiple_countries(case_id):
     save_location_step(
         case_id,

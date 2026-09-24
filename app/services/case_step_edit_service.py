@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import HTTPException
@@ -9,6 +10,9 @@ from temporalio.exceptions import ApplicationError
 from app.services.case_state import build_case_payload, get_case_workflow_config
 from app.services.case_step_draft_service import delete_case_step_draft
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
+from app.services.workflow_runtime_service import start_location_risk_workflow
+
+logger = logging.getLogger(__name__)
 
 # Mirrors ConfigDrivenCaseWorkflow._validate_required_fields /
 # _extract_validation_errors (app/workflows/case_workflow.py). Duplicated
@@ -151,6 +155,15 @@ async def update_case_step_data(
 
     # Committed data supersedes any in-progress draft for this step.
     await delete_case_step_draft(db, case_id=case_id, step_code=step_code)
+
+    # Edited locations bypass the case workflow's completion-time risk fetch,
+    # so fetch risk ids for new/changed polygons in the background. Best
+    # effort: GET /api/risk/cases/{case_id} fills any still missing.
+    if activity_name == "save_location_step":
+        try:
+            await start_location_risk_workflow(case_id)
+        except Exception:
+            logger.exception("Could not start location risk fetch for case %s", case_id)
 
     case_payload = await build_case_payload(db, case_id)
     if case_payload is None:
