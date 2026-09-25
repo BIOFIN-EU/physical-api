@@ -98,3 +98,15 @@ async def get_case_risk(
 
     return risks
 
+
+
+# @router.post("/test_risk")
+# def test_risk(payload: LocationRiskInput) -> str:
+#     import requests
+#     RISK_URL = "https://api.dev.biofindashboard.eu/api/vulnerability/"
+#     url =  f"{RISK_URL}management-actions/priority/"
+#     result = requests.post(url, json=payload.dict())
+#     json_data = result.json()
+#     id = json_data["id"]
+#
+#     return id

@@ -6,6 +6,8 @@ from app.core.settings import settings
 from app.schemas.risk import LocationRiskInput
 
 
+
+
 class RiskFrameworkError(Exception):
     """
     Raised when a Risk Score Framework call fails.
@@ -50,17 +52,15 @@ def get_id_from_risk_framework(payload: LocationRiskInput) -> str:
             timeout=settings.RISK_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
+
+        json_data = response.json()
+        id = json_data["id"]
+        return id
     except httpx.HTTPError as exc:
         _raise_for_response(exc, "priority request")
 
-    risk_url = response.json().get("risk")
-    if not risk_url:
-        raise RiskFrameworkError(
-            "Risk framework priority response has no 'risk' reference.",
-            retryable=False,
-        )
 
-    return risk_url.rstrip("/").rsplit("/", 1)[-1]
+
 
 
 def get_risk_result(risk_id: str) -> dict[str, Any]:
@@ -69,11 +69,12 @@ def get_risk_result(risk_id: str) -> dict[str, Any]:
     """
     try:
         response = httpx.get(
-            _risk_url(f"risk/get/{risk_id}/"),
+            _risk_url(f"management-actions/get/{risk_id}/"),
             timeout=settings.RISK_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
+        return response.json()
     except httpx.HTTPError as exc:
         _raise_for_response(exc, "risk lookup")
 
-    return response.json()
+
