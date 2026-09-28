@@ -168,7 +168,8 @@
                   "display_name": "Function",
                   "type": "select",
                   "required": true,
-                  "options_source": "intermediary_function"
+                  "options_source": "intermediary_function",
+                  "filter_by": "intermediary_id"
                 }
               ]
             }

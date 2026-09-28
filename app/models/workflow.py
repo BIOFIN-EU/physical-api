@@ -4,11 +4,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
+from app.models.mixins import ActorStampMixin
 from app.core.settings import settings
 
 WORKFLOW_SCHEMA = settings.WORKFLOW_DB_SCHEMA
@@ -37,6 +38,7 @@ class CaseWorkflowRun(Base):
     __tablename__ = "case_workflow_runs"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_workflow_runs_case_id"),
+        CheckConstraint("status IN ('draft', 'in_progress', 'completed', 'failed')", name="ck_case_workflow_runs_status"),
         {"schema": WORKFLOW_SCHEMA},
     )
 
@@ -65,7 +67,7 @@ class CaseWorkflowRun(Base):
     )
 
 
-class CaseStepDraft(Base):
+class CaseStepDraft(ActorStampMixin, Base):
     """
     One row per (case, step): the most recent unsaved/partial progress a user
     made on a step they have not submitted yet.
@@ -91,6 +93,9 @@ class CaseStepDraft(Base):
     step_code: Mapped[str] = mapped_column(String(100), nullable=False)
     data: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

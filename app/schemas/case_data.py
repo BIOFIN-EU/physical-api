@@ -718,6 +718,7 @@ class IntermediaryRead(ORMBaseSchema):
 
 class CaseIntermediaryAssign(BaseModel):
     intermediary_id: int
+    intermediary_function_id: int
 
 
 class CaseIntermediaryRead(ORMBaseSchema):
@@ -725,4 +726,5 @@ class CaseIntermediaryRead(ORMBaseSchema):
     case_id: int
     intermediary_id: int
     intermediary_name: Optional[str] = None
+    intermediary_function_id: Optional[int] = None
     created_at: datetime

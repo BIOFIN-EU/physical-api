@@ -1,10 +1,15 @@
+from datetime import datetime, timezone
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.dependencies.case_access import require_case_permission
+from app.dependencies.gateway_identity import get_request_user_id
 from app.models.case_data import (
     CaseUserAccess,
     Intermediary,
@@ -55,8 +60,49 @@ def _map_case_intermediary_read(row: CaseIntermediary) -> CaseIntermediaryRead:
         case_id=row.case_id,
         intermediary_id=row.intermediary_id,
         intermediary_name=row.intermediary.name if row.intermediary else None,
+        intermediary_function_id=row.intermediary_function_id,
         created_at=row.created_at,
     )
+
+
+DUPLICATE_EMAIL = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="An intermediary with this email already exists.",
+)
+
+
+async def _raise_if_email_taken(
+    db: AsyncSession,
+    email: str | None,
+    exclude_id: int | None = None,
+) -> None:
+    """Mirror uq_intermediaries_active_email so a duplicate gets a clear 409."""
+    if not email:
+        return
+
+    query = select(Intermediary.id).where(
+        func.lower(Intermediary.email) == email.lower(),
+        Intermediary.deleted_at.is_(None),
+    )
+    if exclude_id is not None:
+        query = query.where(Intermediary.id != exclude_id)
+
+    if await db.scalar(query) is not None:
+        raise DUPLICATE_EMAIL
+
+
+async def _commit_or_conflict(db: AsyncSession, *, flush_only: bool = False) -> None:
+    # Covers two requests racing past _raise_if_email_taken.
+    try:
+        if flush_only:
+            await db.flush()
+        else:
+            await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        if "uq_intermediaries_active_email" in str(exc.orig):
+            raise DUPLICATE_EMAIL from exc
+        raise
 
 
 async def _validate_intermediary_function_ids(
@@ -97,8 +143,10 @@ async def _validate_intermediary_function_ids(
 async def create_intermediary(
     payload: IntermediaryCreate,
     db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
 ):
     await _validate_intermediary_function_ids(db, payload.function_ids)
+    await _raise_if_email_taken(db, str(payload.email) if payload.email else None)
 
     intermediary = Intermediary(
         name=payload.name,
@@ -107,10 +155,12 @@ async def create_intermediary(
         email=str(payload.email) if payload.email else None,
         contact_details=payload.contact_details,
         notes=payload.notes,
+        created_by=user_id,
+        updated_by=user_id,
     )
 
     db.add(intermediary)
-    await db.flush()
+    await _commit_or_conflict(db, flush_only=True)
 
     for function_id in payload.function_ids:
         db.add(
@@ -120,7 +170,7 @@ async def create_intermediary(
             )
         )
 
-    await db.commit()
+    await _commit_or_conflict(db)
 
     result = await db.execute(
         select(Intermediary)
@@ -149,6 +199,7 @@ async def list_intermediaries(
                 IntermediaryFunctionAssignment.intermediary_function
             )
         )
+        .where(Intermediary.deleted_at.is_(None))
         .order_by(Intermediary.name)
     )
 
@@ -168,7 +219,7 @@ async def get_intermediary(
 ):
     result = await db.execute(
         select(Intermediary)
-        .where(Intermediary.id == intermediary_id)
+        .where(Intermediary.id == intermediary_id, Intermediary.deleted_at.is_(None))
         .options(
             selectinload(Intermediary.functions).selectinload(
                 IntermediaryFunctionAssignment.intermediary_function
@@ -192,9 +243,13 @@ async def update_intermediary(
     intermediary_id: int,
     payload: IntermediaryUpdate,
     db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
 ):
     result = await db.execute(
-        select(Intermediary).where(Intermediary.id == intermediary_id)
+        select(Intermediary).where(
+            Intermediary.id == intermediary_id,
+            Intermediary.deleted_at.is_(None),
+        )
     )
 
     intermediary = result.scalar_one_or_none()
@@ -205,11 +260,16 @@ async def update_intermediary(
     update_data = payload.model_dump(exclude_unset=True)
     function_ids = update_data.pop("function_ids", None)
 
+    if update_data.get("email"):
+        await _raise_if_email_taken(db, str(update_data["email"]), exclude_id=intermediary.id)
+
     for field, value in update_data.items():
         if field == "email" and value is not None:
             value = str(value)
 
         setattr(intermediary, field, value)
+
+    intermediary.updated_by = user_id
 
     if function_ids is not None:
         await _validate_intermediary_function_ids(db, function_ids)
@@ -228,7 +288,7 @@ async def update_intermediary(
                 )
             )
 
-    await db.commit()
+    await _commit_or_conflict(db)
 
     result = await db.execute(
         select(Intermediary)
@@ -250,7 +310,14 @@ async def update_intermediary(
 async def delete_intermediary(
     intermediary_id: int,
     db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
 ):
+    """
+    Soft delete: the intermediary disappears from lists, lookups and new
+    assignments, but the row stays, so projects that already use it keep
+    their assignment (a hard delete cascaded those away). Repeating it is a
+    no-op.
+    """
     result = await db.execute(
         select(Intermediary).where(Intermediary.id == intermediary_id)
     )
@@ -260,8 +327,10 @@ async def delete_intermediary(
     if intermediary is None:
         raise HTTPException(status_code=404, detail="Intermediary not found")
 
-    await db.delete(intermediary)
-    await db.commit()
+    if intermediary.deleted_at is None:
+        intermediary.deleted_at = datetime.now(timezone.utc)
+        intermediary.deleted_by = user_id
+        await db.commit()
 
 
 # ---------------------------------------------------------
@@ -280,7 +349,10 @@ async def assign_intermediary_to_case(
     access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ):
     result = await db.execute(
-        select(Intermediary).where(Intermediary.id == payload.intermediary_id)
+        select(Intermediary).where(
+            Intermediary.id == payload.intermediary_id,
+            Intermediary.deleted_at.is_(None),
+        )
     )
 
     intermediary = result.scalar_one_or_none()
@@ -288,24 +360,29 @@ async def assign_intermediary_to_case(
     if intermediary is None:
         raise HTTPException(status_code=404, detail="Intermediary not found")
 
+    await _validate_intermediary_function_ids(db, [payload.intermediary_function_id])
+
+    # Matches uq_case_intermediary_function: one row per intermediary *and*
+    # function, so the same intermediary can hold several functions.
     existing_result = await db.execute(
         select(CaseIntermediary).where(
             CaseIntermediary.case_id == case_id,
             CaseIntermediary.intermediary_id == payload.intermediary_id,
+            CaseIntermediary.intermediary_function_id == payload.intermediary_function_id,
         )
     )
 
-    existing = existing_result.scalar_one_or_none()
-
-    if existing:
+    if existing_result.scalar_one_or_none():
         raise HTTPException(
             status_code=409,
-            detail="Intermediary already assigned to this case",
+            detail="Intermediary already assigned to this case with this function",
         )
 
     row = CaseIntermediary(
         case_id=case_id,
         intermediary_id=payload.intermediary_id,
+        intermediary_function_id=payload.intermediary_function_id,
+        created_by=access.user_id,
     )
 
     db.add(row)
@@ -349,23 +426,31 @@ async def list_case_intermediaries(
 async def remove_intermediary_from_case(
     case_id: int,
     intermediary_id: int,
+    intermediary_function_id: int | None = None,
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ):
-    result = await db.execute(
-        select(CaseIntermediary).where(
-            CaseIntermediary.case_id == case_id,
-            CaseIntermediary.intermediary_id == intermediary_id,
-        )
+    """
+    Remove an intermediary from a case: every function it holds there, or
+    only `intermediary_function_id` when given.
+    """
+    query = select(CaseIntermediary).where(
+        CaseIntermediary.case_id == case_id,
+        CaseIntermediary.intermediary_id == intermediary_id,
     )
+    if intermediary_function_id is not None:
+        query = query.where(
+            CaseIntermediary.intermediary_function_id == intermediary_function_id
+        )
 
-    row = result.scalar_one_or_none()
+    rows = (await db.execute(query)).scalars().all()
 
-    if row is None:
+    if not rows:
         raise HTTPException(
             status_code=404,
             detail="Case intermediary assignment not found",
         )
 
-    await db.delete(row)
+    for row in rows:
+        await db.delete(row)
     await db.commit()

@@ -29,6 +29,7 @@ from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAc
 from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
 from app.services.auth_user_service import resolve_user_id_by_email
 from app.services.case_delete_service import soft_delete_case
+from app.workflows.actor import ACTOR_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +249,12 @@ async def submit_step(
             )
 
         try:
-            await handle.signal("submit_step", payload)
+            # Who is saving, for created_by / updated_by. Set last so a
+            # client-supplied value can never override it.
+            await handle.signal(
+                "submit_step",
+                {**payload, ACTOR_KEY: str(access.user_id)},
+            )
         except RPCError as exc:
             _raise_for_temporal_rpc_error(exc)
 
@@ -389,6 +395,7 @@ async def submit_file_step(
             "_step_code": current_step,
             "_field_name": field_name,
             field_name: file_payload,
+            ACTOR_KEY: str(access.user_id),
         }
 
         try:
@@ -539,6 +546,7 @@ async def edit_case_step(
         case_id=case_id,
         step_code=step_code,
         payload=payload,
+        actor_user_id=access.user_id,
     )
 
 
@@ -555,6 +563,7 @@ async def save_case_step_draft(
         case_id=case_id,
         step_code=step_code,
         data=payload.data,
+        actor_user_id=access.user_id,
     )
 
 

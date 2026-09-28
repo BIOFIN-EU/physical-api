@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from temporalio.exceptions import ApplicationError
 from app.services.case_state import build_case_payload, get_case_workflow_config
 from app.services.case_step_draft_service import delete_case_step_draft
 from app.workflows.activity_registry import ACTIVITY_REGISTRY
+from app.workflows.actor import ACTOR_KEY
 from app.services.workflow_runtime_service import start_location_risk_workflow
 
 logger = logging.getLogger(__name__)
@@ -68,6 +70,7 @@ async def update_case_step_data(
     case_id: int,
     step_code: str,
     payload: dict[str, Any],
+    actor_user_id: UUID | None = None,
 ) -> dict[str, Any]:
     workflow_config = await get_case_workflow_config(db, case_id)
 
@@ -134,7 +137,11 @@ async def update_case_step_data(
         )
 
     try:
-        activity_fn(case_id, payload)
+        # Set last so a client-supplied value can never override it.
+        activity_payload = {**payload}
+        if actor_user_id is not None:
+            activity_payload[ACTOR_KEY] = str(actor_user_id)
+        activity_fn(case_id, activity_payload)
     except ApplicationError as exc:
         if exc.type == "ValidationError":
             raise HTTPException(

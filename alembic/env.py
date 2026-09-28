@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import text
 
 from alembic import context
 
@@ -77,6 +78,14 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Alembic's version table lives in the case_data schema and is created
+        # before any migration runs, so on an empty database the schema must
+        # exist first (the baseline migration's CREATE SCHEMA runs too late).
+        connection.execute(
+            text(f'CREATE SCHEMA IF NOT EXISTS "{settings.CASE_DATA_DB_SCHEMA}"')
+        )
+        connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

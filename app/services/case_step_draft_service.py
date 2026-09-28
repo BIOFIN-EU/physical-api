@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import delete, select
@@ -46,6 +47,7 @@ async def upsert_case_step_draft(
     case_id: int,
     step_code: str,
     data: dict[str, Any],
+    actor_user_id: UUID | None = None,
 ) -> dict[str, Any]:
     """
     Create or overwrite the single draft row for this (case_id, step_code).
@@ -58,10 +60,17 @@ async def upsert_case_step_draft(
     draft = await _get_draft_row(db, case_id=case_id, step_code=step_code)
 
     if draft is None:
-        draft = CaseStepDraft(case_id=case_id, step_code=step_code, data=data)
+        draft = CaseStepDraft(
+            case_id=case_id,
+            step_code=step_code,
+            data=data,
+            created_by=actor_user_id,
+            updated_by=actor_user_id,
+        )
         db.add(draft)
     else:
         draft.data = data
+        draft.updated_by = actor_user_id
 
     await db.commit()
     await db.refresh(draft)

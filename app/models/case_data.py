@@ -5,8 +5,10 @@ from typing import Optional
 from decimal import Decimal
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy import (
+    text,
     Boolean,
     CheckConstraint,
+    Index,
     DateTime,
     Float,
     ForeignKey,
@@ -20,14 +22,22 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
+from app.models.mixins import ActorStampMixin, CreatedByMixin, SoftDeleteMixin
 from app.core.settings import settings
 
 CASE_DATA_SCHEMA = settings.CASE_DATA_DB_SCHEMA
 
 
+# Mirrors the statuses ConfigDrivenCaseWorkflow sets.
+CASE_STATUS_CHECK = "status IN ('draft', 'in_progress', 'completed', 'failed')"
+
+
 class Case(Base):
     __tablename__ = "cases"
-    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+    __table_args__ = (
+        CheckConstraint(CASE_STATUS_CHECK, name="ck_cases_status"),
+        {"schema": CASE_DATA_SCHEMA},
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
@@ -133,7 +143,7 @@ class CaseAccessAuditLog(Base):
 # Consent
 # ---------------------------------------------------------
 
-class CaseConsent(Base):
+class CaseConsent(ActorStampMixin, Base):
     __tablename__ = "case_consents"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_consents_case_id"),
@@ -162,7 +172,7 @@ class CaseConsent(Base):
 # Basic Info
 # ---------------------------------------------------------
 
-class CaseBasicInfo(Base):
+class CaseBasicInfo(ActorStampMixin, Base):
     __tablename__ = "case_basic_info"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_basic_info_case_id"),
@@ -191,9 +201,13 @@ class CaseBasicInfo(Base):
 # 1. Location table
 # ---------------------------------------------------------
 
-class CaseLocation(Base):
+class CaseLocation(ActorStampMixin, Base):
     __tablename__ = "case_locations"
     __table_args__ = (
+        CheckConstraint(
+            "location_type IN ('polygon', 'point')",
+            name="ck_case_locations_location_type",
+        ),
         {"schema": CASE_DATA_SCHEMA},
     )
 
@@ -202,6 +216,7 @@ class CaseLocation(Base):
     case_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     friendly_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -221,6 +236,7 @@ class CaseLocation(Base):
     country_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.countries.id"),
         nullable=False,
+        index=True,
     )
     country: Mapped["Country"] = relationship()
 
@@ -240,7 +256,7 @@ class CaseLocation(Base):
 # 2. Financial table
 # ---------------------------------------------------------
 
-class CaseFinancial(Base):
+class CaseFinancial(ActorStampMixin, Base):
     __tablename__ = "case_financials"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_financials_case_id"),
@@ -283,7 +299,7 @@ class CaseFinancial(Base):
 # 3. identifiers / scheme numbers table
 # ---------------------------------------------------------
 
-class CaseIdentifiers(Base):
+class CaseIdentifiers(ActorStampMixin, Base):
     __tablename__ = "case_identifiers"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_identifiers_case_id"),
@@ -312,7 +328,7 @@ class CaseIdentifiers(Base):
 # 4. Operators table
 # ---------------------------------------------------------
 
-class Operator(Base):
+class Operator(ActorStampMixin, Base):
     __tablename__ = "operators"
     __table_args__ = (
         {"schema": CASE_DATA_SCHEMA},
@@ -323,6 +339,7 @@ class Operator(Base):
     case_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -381,9 +398,15 @@ class OperatorSpecialty(Base):
 # ---------------------------------------------------------
 
 
-class CaseDocument(Base):
+class CaseDocument(ActorStampMixin, Base):
     __tablename__ = "case_documents"
     __table_args__ = (
+        # One document per file field of a step (save_supporting_document_step
+        # updates it in place).
+        UniqueConstraint(
+            "case_id", "step_code", "field_name",
+            name="uq_case_documents_case_step_field",
+        ),
         {"schema": CASE_DATA_SCHEMA},
     )
 
@@ -392,6 +415,7 @@ class CaseDocument(Base):
     case_id: Mapped[int] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     step_code: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -469,7 +493,7 @@ class FinancingType(Base):
 # 3. Financing Type join table (multiselect)
 # ---------------------------------------------------------
 
-class CaseFinancingType(Base):
+class CaseFinancingType(ActorStampMixin, Base):
     __tablename__ = "case_financing_types"
     __table_args__ = (
         UniqueConstraint(
@@ -496,6 +520,9 @@ class CaseFinancingType(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 
@@ -533,7 +560,7 @@ class ImplementationStage(Base):
 # 6. Nature-Based Solution Info
 # ---------------------------------------------------------
 
-class CaseNatureBasedSolution(Base):
+class CaseNatureBasedSolution(ActorStampMixin, Base):
     __tablename__ = "case_nature_based_solutions"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_nature_based_solutions_case_id"),
@@ -597,7 +624,7 @@ class CaseNatureBasedSolution(Base):
 # 7. Funding Requirements
 # ---------------------------------------------------------
 
-class CaseFundingRequirement(Base):
+class CaseFundingRequirement(ActorStampMixin, Base):
     __tablename__ = "case_funding_requirements"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_funding_requirements_case_id"),
@@ -643,7 +670,7 @@ class CaseFundingRequirement(Base):
 # 8. Investment Rationale
 # ---------------------------------------------------------
 
-class CaseInvestmentRationale(Base):
+class CaseInvestmentRationale(ActorStampMixin, Base):
     __tablename__ = "case_investment_rationales"
     __table_args__ = (
         UniqueConstraint("case_id", name="uq_case_investment_rationales_case_id"),
@@ -750,9 +777,19 @@ class IntermediaryFunction(Base):
     function_category: Mapped[str] = mapped_column(String(50), nullable=False)
 
 
-class Intermediary(Base):
+class Intermediary(ActorStampMixin, SoftDeleteMixin, Base):
     __tablename__ = "intermediaries"
-    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+    __table_args__ = (
+        # One active intermediary per email, ignoring case; a deleted one's
+        # email can be reused.
+        Index(
+            "uq_intermediaries_active_email",
+            text("lower(email)"),
+            unique=True,
+            postgresql_where=text("email IS NOT NULL AND deleted_at IS NULL"),
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
@@ -786,7 +823,7 @@ class Intermediary(Base):
     )
 
 
-class CaseIntermediary(Base):
+class CaseIntermediary(CreatedByMixin, Base):
     __tablename__ = "case_intermediaries"
 
     __table_args__ = (

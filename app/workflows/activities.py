@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import create_engine, select, update
+from sqlalchemy import create_engine, event, func, select, update
 from sqlalchemy.exc import DataError, IntegrityError, StatementError
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
@@ -13,6 +14,7 @@ from temporalio.exceptions import ApplicationError
 from pydantic import ValidationError
 
 from app.core.settings import settings
+from app.workflows.actor import ACTOR_KEY
 from app.models.case_data import Case, Country
 from app.models.workflow import CaseWorkflowRun, CaseStepDraft
 from app.models.case_data import (
@@ -28,7 +30,8 @@ from app.models.case_data import (
     CaseInvestmentRationale,
     CaseIntermediary,
     Intermediary,
-    IntermediaryFunction
+    IntermediaryFunction,
+    IntermediaryFunctionAssignment,
 )
 from app.schemas.case_workflow import (
     ConsentStepInput,
@@ -69,6 +72,52 @@ SessionLocal = sessionmaker(
     future=True,
     expire_on_commit=False,
 )
+
+
+# --- Who made the change ---
+
+
+
+@event.listens_for(SessionLocal, "before_flush")
+def _stamp_actor(session: Session, flush_context, instances) -> None:
+    """
+    Fill created_by / updated_by (ActorStampMixin, CreatedByMixin, Case) from
+    session.info["actor_user_id"] on every row written in this flush. Sessions
+    with no actor (system jobs, older callers) leave them untouched.
+    """
+    actor = session.info.get("actor_user_id")
+    if actor is None:
+        return
+
+    for obj in session.new:
+        if hasattr(obj, "created_by") and obj.created_by is None:
+            obj.created_by = actor
+        if hasattr(obj, "updated_by"):
+            obj.updated_by = actor
+
+    for obj in session.dirty:
+        if hasattr(obj, "updated_by") and session.is_modified(obj, include_collections=False):
+            obj.updated_by = actor
+
+
+def _pop_actor(data: dict) -> UUID | None:
+    """Take the acting user's id out of a step payload (None if absent/invalid)."""
+    raw = data.pop(ACTOR_KEY, None) if isinstance(data, dict) else None
+    try:
+        return UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _begin_user_write(session: Session, case_id: int, actor: UUID | None) -> None:
+    """
+    Record who is saving this step: rows written in this session get
+    created_by / updated_by, and the case's updated_at (and updated_by) move
+    to now, so the project list shows the real last edit.
+    """
+    session.info["actor_user_id"] = actor
+    case = _get_case_or_raise(session, case_id)
+    case.updated_at = func.now()
 
 
 # --- Error helpers ---
@@ -566,11 +615,12 @@ def save_location_step(case_id: int, data: dict) -> None:
     submitted are deleted. Country is always auto-detected server-side from
     each entry's geometry, and is never accepted from the client.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(LocationStepInput, data)
     _log_activity_payload("save_location_step", case_id, payload)
 
     with SessionLocal() as session:
-        _get_case_or_raise(session, case_id)
+        _begin_user_write(session, case_id, actor)
 
         unmatched = list(
             session.execute(
@@ -611,6 +661,7 @@ def save_financial_step(case_id: int, data: dict) -> None:
     """
     Save or update the financial step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(FinancialStepInput, data)
 
     _validate_currency(payload.currency)
@@ -622,6 +673,8 @@ def save_financial_step(case_id: int, data: dict) -> None:
     _log_activity_payload("save_financial_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseFinancial).where(CaseFinancial.case_id == case_id)
         ).scalar_one_or_none()
@@ -652,10 +705,13 @@ def save_identifiers_step(case_id: int, data: dict) -> None:
     """
     Save or update the identifiers step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(IdentifiersStepInput, data)
     _log_activity_payload("save_identifiers_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseIdentifiers).where(CaseIdentifiers.case_id == case_id)
         ).scalar_one_or_none()
@@ -684,10 +740,13 @@ def save_basic_info_step(case_id: int, data: dict) -> None:
     """
     Save or update the basic information step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(BasicInfoStepInput, data)
     _log_activity_payload("save_basic_info_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseBasicInfo).where(CaseBasicInfo.case_id == case_id)
         ).scalar_one_or_none()
@@ -712,6 +771,7 @@ def save_financing_type_step(case_id: int, data: dict) -> None:
     """
     Save or update the financing type step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(FinancingTypeStepInput, data)
 
     if not isinstance(payload.financing_type_id, int) or payload.financing_type_id <= 0:
@@ -727,6 +787,8 @@ def save_financing_type_step(case_id: int, data: dict) -> None:
     _log_activity_payload("save_financing_type_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseFinancingType).where(CaseFinancingType.case_id == case_id)
         ).scalar_one_or_none()
@@ -749,10 +811,13 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
     """
     Save or update the nature-based solution step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(NatureBasedSolutionStepInput, data)
     _log_activity_payload("save_nature_based_solution_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseNatureBasedSolution).where(
                 CaseNatureBasedSolution.case_id == case_id
@@ -793,6 +858,7 @@ def save_funding_requirements_step(case_id: int, data: dict) -> None:
     """
     Save or update the funding requirements step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(FundingRequirementsStepInput, data)
 
     _validate_currency(payload.currency)
@@ -805,6 +871,8 @@ def save_funding_requirements_step(case_id: int, data: dict) -> None:
     _log_activity_payload("save_funding_requirements_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseFundingRequirement).where(
                 CaseFundingRequirement.case_id == case_id
@@ -841,10 +909,13 @@ def save_investment_rationale_step(case_id: int, data: dict) -> None:
     """
     Save or update the investment rationale step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(InvestmentRationaleStepInput, data)
     _log_activity_payload("save_investment_rationale_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseInvestmentRationale).where(
                 CaseInvestmentRationale.case_id == case_id
@@ -1008,6 +1079,7 @@ def save_supporting_document_step(case_id: int, data: dict) -> None:
     """
     Save or update a supporting document reference for a workflow step.
     """
+    actor = _pop_actor(data)
     step_code = data.get("_step_code")
     field_name = data.get("_field_name")
     document_notes = data.get("document_notes")
@@ -1027,6 +1099,8 @@ def save_supporting_document_step(case_id: int, data: dict) -> None:
     )
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseDocument).where(
                 CaseDocument.case_id == case_id,
@@ -1075,21 +1149,30 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
     - one case
     - one intermediary
     - one intermediary function
+
+    The submitted list is the full set. Assignments matching an existing row
+    (same intermediary and function) keep that row, so its id and created_by
+    survive a re-save; new ones are added and ones no longer submitted are
+    removed.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(IntermediaryStepInput, data)
     _log_activity_payload("save_intermediary_step", case_id, payload)
 
     with SessionLocal() as session:
-        _get_case_or_raise(session, case_id)
+        _begin_user_write(session, case_id, actor)
 
-        # Replace all existing intermediary assignments for this case
-        session.execute(
-            CaseIntermediary.__table__.delete().where(
-                CaseIntermediary.case_id == case_id
-            )
-        )
+        existing = {
+            (row.intermediary_id, row.intermediary_function_id): row
+            for row in session.execute(
+                select(CaseIntermediary).where(CaseIntermediary.case_id == case_id)
+            ).scalars()
+        }
+        # Intermediaries already on this case stay assignable after they are
+        # (soft) deleted; a deleted one can't be newly added.
+        already_assigned = {intermediary_id for intermediary_id, _ in existing}
 
-        seen: set[tuple[int, int]] = set()
+        submitted: set[tuple[int, int]] = set()
 
         for assignment in payload.assignments:
             key = (
@@ -1097,10 +1180,10 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
                 assignment.intermediary_function_id,
             )
 
-            if key in seen:
+            if key in submitted:
                 continue
 
-            seen.add(key)
+            submitted.add(key)
 
             intermediary = session.execute(
                 select(Intermediary).where(
@@ -1108,7 +1191,10 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
                 )
             ).scalar_one_or_none()
 
-            if intermediary is None:
+            if intermediary is None or (
+                intermediary.deleted_at is not None
+                and intermediary.id not in already_assigned
+            ):
                 _raise_validation_error(
                     "Please correct the highlighted fields.",
                     {
@@ -1134,13 +1220,39 @@ def save_intermediary_step(case_id: int, data: dict) -> None:
                     },
                 )
 
-            session.add(
-                CaseIntermediary(
-                    case_id=case_id,
-                    intermediary_id=assignment.intermediary_id,
-                    intermediary_function_id=assignment.intermediary_function_id,
+            # The function must be one the intermediary provides; a pairing
+            # this case already has stays valid if that list changes later.
+            provides_function = session.execute(
+                select(IntermediaryFunctionAssignment.id).where(
+                    IntermediaryFunctionAssignment.intermediary_id == assignment.intermediary_id,
+                    IntermediaryFunctionAssignment.intermediary_function_id
+                    == assignment.intermediary_function_id,
                 )
-            )
+            ).first()
+
+            if provides_function is None and key not in existing:
+                _raise_validation_error(
+                    "Please correct the highlighted fields.",
+                    {
+                        "assignments": (
+                            f"{intermediary.name} doesn't provide the "
+                            f"function {intermediary_function.name}."
+                        )
+                    },
+                )
+
+            if key not in existing:
+                session.add(
+                    CaseIntermediary(
+                        case_id=case_id,
+                        intermediary_id=assignment.intermediary_id,
+                        intermediary_function_id=assignment.intermediary_function_id,
+                    )
+                )
+
+        for key, row in existing.items():
+            if key not in submitted:
+                session.delete(row)
 
         _commit_or_raise(session)
 
@@ -1150,10 +1262,13 @@ def save_consent_step(case_id: int, data: dict) -> None:
     """
     Save or update the consent step for a case.
     """
+    actor = _pop_actor(data)
     payload = _parse_pydantic(ConsentStepInput, data)
     _log_activity_payload("save_consent_step", case_id, payload)
 
     with SessionLocal() as session:
+        _begin_user_write(session, case_id, actor)
+
         existing = session.execute(
             select(CaseConsent).where(CaseConsent.case_id == case_id)
         ).scalar_one_or_none()
