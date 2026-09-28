@@ -3,17 +3,22 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.case_data import CaseUserAccess, CaseAccessAuditLog
+from app.models.case_data import Case, CaseUserAccess, CaseAccessAuditLog
 
 async def get_case_user_access(
         db: AsyncSession,
         case_id: int,
         user_id: UUID,
 ) -> CaseUserAccess | None:
+    # Soft-deleted cases grant no access, which hides them from every
+    # endpoint guarded by require_case_permission.
     result = await db.execute(
-        select(CaseUserAccess).where(
+        select(CaseUserAccess)
+        .join(Case, Case.id == CaseUserAccess.case_id)
+        .where(
             CaseUserAccess.case_id == case_id,
             CaseUserAccess.user_id == user_id,
+            Case.deleted_at.is_(None),
         )
     )
 

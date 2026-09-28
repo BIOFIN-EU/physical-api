@@ -28,6 +28,7 @@ from app.dependencies.case_access import require_case_permission
 from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAccessRequest
 from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
 from app.services.auth_user_service import resolve_user_id_by_email
+from app.services.case_delete_service import soft_delete_case
 
 logger = logging.getLogger(__name__)
 
@@ -663,6 +664,44 @@ async def get_cases(
 ) -> list[dict[str, Any]]:
     cases = await fetch_cases(db=db, user_id=user_id)
     return cases
+
+
+@router.delete("/cases/{case_id}", status_code=204)
+async def delete_case(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
+) -> None:
+    """
+    Soft-delete a project (requires can_delete). Its data stays in the
+    database, but it disappears from the project list and every case endpoint
+    returns 404 for it. Deleting it again is a no-op.
+    """
+    temporal_workflow_id = await soft_delete_case(db, case_id=case_id, user_id=user_id)
+
+    # An unfinished workflow would otherwise wait forever for a step that can
+    # no longer be submitted. The case is already deleted at this point, so a
+    # failure here is only logged.
+    if temporal_workflow_id:
+        try:
+            client = await Client.connect(settings.TEMPORAL_ADDRESS)
+            await client.get_workflow_handle(temporal_workflow_id).terminate(
+                reason="Project deleted"
+            )
+        except RPCError as exc:
+            if exc.status != RPCStatusCode.NOT_FOUND:
+                logger.warning(
+                    "Could not terminate workflow %s for deleted case %s: %s",
+                    temporal_workflow_id,
+                    case_id,
+                    exc,
+                )
+        except Exception:
+            logger.exception(
+                "Could not terminate workflow %s for deleted case %s",
+                temporal_workflow_id,
+                case_id,
+            )
 
 @router.post("/cases/{case_id}/users")
 async def add_case_user(

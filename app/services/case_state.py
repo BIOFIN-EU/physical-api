@@ -397,10 +397,18 @@ async def build_case_payload(
 
 async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
     stmt = (
-        select(Case, CaseBasicInfo.name, CaseBasicInfo.high_level_description)
+        select(
+            Case,
+            CaseBasicInfo.name,
+            CaseBasicInfo.high_level_description,
+            CaseUserAccess.can_delete,
+        )
         .join(CaseUserAccess, CaseUserAccess.case_id == Case.id)
         .outerjoin(CaseBasicInfo, CaseBasicInfo.case_id == Case.id)
-        .where(CaseUserAccess.user_id == user_id)
+        .where(
+            CaseUserAccess.user_id == user_id,
+            Case.deleted_at.is_(None),
+        )
     )
 
     result = await db.execute(stmt)
@@ -420,8 +428,9 @@ async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
             "createdAt": to_json_value(case.created_at),
             "updatedBy": str(case.updated_by),
             "updatedAt": to_json_value(case.updated_at),
+            "canDelete": bool(can_delete),
         }
-        for case, name, high_level_description in rows
+        for case, name, high_level_description, can_delete in rows
     ]
 
 

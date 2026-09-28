@@ -43,6 +43,13 @@ class Case(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    # Soft delete: a deleted case keeps all its rows but is hidden from every
+    # endpoint (see get_case_user_access and fetch_cases).
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    deleted_by: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+
 
 class CaseUserAccess(Base):
     __tablename__ = "case_user_access"

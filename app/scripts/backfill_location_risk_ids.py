@@ -22,7 +22,7 @@ import sys
 
 from sqlalchemy import func, select
 
-from app.models.case_data import CaseLocation
+from app.models.case_data import Case, CaseLocation
 from app.workflows.activities import SessionLocal, fill_missing_location_risk_ids
 
 logger = logging.getLogger("backfill_location_risk_ids")
@@ -34,9 +34,11 @@ def _missing_counts(case_ids: list[int] | None) -> dict[int, int]:
     """
     query = (
         select(CaseLocation.case_id, func.count())
+        .join(Case, Case.id == CaseLocation.case_id)
         .where(
             CaseLocation.location_type == "polygon",
             CaseLocation.risk_id.is_(None),
+            Case.deleted_at.is_(None),
         )
         .group_by(CaseLocation.case_id)
         .order_by(CaseLocation.case_id)
