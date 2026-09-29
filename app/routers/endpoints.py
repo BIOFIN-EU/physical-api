@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import status, case_workflow, lookups, intermediaries, support, risk
+from app.routers import status, case_workflow, lookups, intermediaries, support, risk, bng
 
 
 api_router = APIRouter()
@@ -32,3 +32,7 @@ api_router.include_router(support.router,
 api_router.include_router(risk.router,
                           prefix=f"{std_prefix}/risk",
                           tags=["Risk"])
+
+api_router.include_router(bng.router,
+                          prefix=f"{std_prefix}/bng",
+                          tags=["Biodiversity Net Gain"])

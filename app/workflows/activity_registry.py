@@ -30,3 +30,9 @@ ACTIVITY_REGISTRY = {
     # Worker's activities list (see app/workers/temporal_worker.py).
     "clear_step_draft": clear_step_draft
 }
+
+# Biodiversity Net Gain prototype workflows (bng_*); separate module so none
+# of the existing activities change.
+from app.workflows.bng_activities import BNG_ACTIVITIES  # noqa: E402
+
+ACTIVITY_REGISTRY.update(BNG_ACTIVITIES)

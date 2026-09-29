@@ -12,6 +12,7 @@ from app.core.db import Base  # noqa: E402
 from app.core.settings import settings  # noqa: E402
 import app.models.case_data  # noqa: E402,F401
 import app.models.workflow  # noqa: E402,F401
+import app.models.bng  # noqa: E402,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

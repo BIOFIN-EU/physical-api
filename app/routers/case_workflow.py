@@ -30,6 +30,7 @@ from app.services.case_user_access_service import create_case_user_access, updat
 from app.services.auth_user_service import resolve_user_id_by_email
 from app.services.case_delete_service import soft_delete_case
 from app.workflows.actor import ACTOR_KEY
+from app.services.bng_roles import add_creator_role, authorize_step, is_rejection, record_signoff
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,8 @@ async def start_case(
             can_assign_users=True,
         )
     )
+    # BNG projects only: the creator's BNG role (landowner / developer).
+    add_creator_role(db, case_id=case_id, workflow_code=workflow_code, user_id=user_id)
 
     await db.commit()
 
@@ -237,7 +240,10 @@ async def submit_step(
         if not current_step:
             raise HTTPException(status_code=400, detail="No current step available")
 
-        errors = _validate_fields(step_config, payload)
+        # BNG steps with "roles" only (None, and no change, for all others).
+        capacity = await authorize_step(db, access=access, step_config=step_config, payload=payload)
+
+        errors = {} if is_rejection(step_config, payload) else _validate_fields(step_config, payload)
         if errors:
             raise HTTPException(
                 status_code=422,
@@ -286,6 +292,7 @@ async def submit_step(
                         },
                     )
 
+                await record_signoff(db, case_id=case_id, step_code=current_step, user_id=access.user_id, capacity=capacity)
                 return {
                     "message": "Step submitted successfully",
                     "state": state,
@@ -319,6 +326,7 @@ async def submit_step(
                     new_status,
                     state
                 )
+                await record_signoff(db, case_id=case_id, step_code=current_step, user_id=access.user_id, capacity=capacity)
                 return {
                     "message": "Step submitted successfully",
                     "state": state,
@@ -541,13 +549,28 @@ async def edit_case_step(
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ):
-    return await update_case_step_data(
+    # BNG steps with "roles" only (None, and no change, for all others).
+    workflow_config = await get_case_workflow_config(db=db, case_id=case_id) or {}
+    capacity = await authorize_step(
+        db,
+        access=access,
+        step_config=(workflow_config.get("steps") or {}).get(step_code),
+        payload=payload,
+    )
+    if capacity is not None and capacity.get("decision") == "rejected":
+        raise HTTPException(status_code=400, detail="A saved step can't be rejected; edit it instead.")
+
+    result = await update_case_step_data(
         db,
         case_id=case_id,
         step_code=step_code,
         payload=payload,
         actor_user_id=access.user_id,
     )
+    await record_signoff(
+        db, case_id=case_id, step_code=step_code, user_id=access.user_id, capacity=capacity, decision="edited"
+    )
+    return result
 
 
 @router.put("/cases/{case_id}/steps/{step_code}/draft", response_model=CaseStepDraftResponse)
