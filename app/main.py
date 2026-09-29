@@ -10,6 +10,7 @@ from app.logging_config import setup_logging
 from app.routers.endpoints import api_router
 from app.core.db import SessionLocal, init_db
 from app.core.seed_case_data_lookups import seed_case_data_lookups
+from app.core.seed_bng import seed_bng_reference_data
 from app.core.exceptions import AppError
 from app.services.object_storage_service import ensure_bucket_exists
 
@@ -27,6 +28,9 @@ async def lifespan(app: FastAPI):
 
     async with SessionLocal() as session:
         await seed_case_data_lookups(session)
+
+    async with SessionLocal() as session:
+        await seed_bng_reference_data(session)
 
     logger.info("Database initialized and workflow lookups seeded.")
     yield

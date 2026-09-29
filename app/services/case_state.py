@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.workflow_config_service import WorkflowConfigService
+from app.models.bng import BNG_WORKFLOWS
+from app.services.bng_payload import add_bng_sections
 from app.models.case_data import (
     Case,
     CaseUserAccess,
@@ -391,6 +393,11 @@ async def build_case_payload(
                 if rows is not None
                 else None
             )
+
+    # Biodiversity Net Gain prototype cases only; no other case type is
+    # affected.
+    if case.case_type in BNG_WORKFLOWS:
+        await add_bng_sections(db, case, payload, workflows.get(case.case_type, {}))
 
     return payload
 

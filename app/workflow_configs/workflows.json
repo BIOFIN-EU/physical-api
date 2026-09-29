@@ -475,6 +475,846 @@
           ]
         }
       }
+    },
+    "bng_habitat_bank_v1": {
+      "code": "bng_habitat_bank_v1",
+      "name": "BNG Habitat Bank",
+      "start_step": "consent",
+      "steps": {
+        "consent": {
+          "title": "Data Collection and Sharing",
+          "activity": "save_consent_step",
+          "next": "basic_info",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "disclaimer_text",
+              "display_name": "Disclaimer",
+              "type": "content",
+              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+            },
+            {
+              "name": "disclaimer_acknowledged",
+              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "type": "checkbox",
+              "required": true
+            },
+            {
+              "name": "allow_data_sharing",
+              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "type": "checkbox",
+              "required": true
+            }
+          ],
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Landowner / Habitat Bank"
+        },
+        "basic_info": {
+          "title": "Habitat Bank Name and Description",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Landowner / Habitat Bank",
+          "activity": "save_basic_info_step",
+          "next": "site_registration",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "name",
+              "display_name": "Habitat Bank Name",
+              "help_text": "A short name that identifies this habitat bank across the platform, for example in the project list.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "high_level_description",
+              "display_name": "Description",
+              "help_text": "A brief summary of the habitat bank: what it involves, where it is and what it aims to achieve.",
+              "type": "textarea",
+              "required": true
+            }
+          ]
+        },
+        "site_registration": {
+          "title": "Site Registration",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Landowner / Habitat Bank",
+          "activity": "save_bng_site_registration_step",
+          "next": "location",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "landowner_name",
+              "display_name": "Landowner",
+              "help_text": "The person or organisation that owns the land.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "ownership_type",
+              "display_name": "Ownership",
+              "help_text": "How the landowner holds the land.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Freehold",
+                  "label": "Freehold"
+                },
+                {
+                  "value": "Leasehold",
+                  "label": "Leasehold"
+                },
+                {
+                  "value": "Other",
+                  "label": "Other"
+                }
+              ]
+            },
+            {
+              "name": "land_registry_title",
+              "display_name": "Land Registry Title Number",
+              "help_text": "The HM Land Registry title number(s) for the site, if registered.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "supply_role",
+              "display_name": "BNG Supply Role",
+              "help_text": "How this site will supply biodiversity units.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Habitat bank selling units to developments",
+                  "label": "Habitat bank selling units to developments"
+                },
+                {
+                  "value": "Landowner supplying units for a specific development",
+                  "label": "Landowner supplying units for a specific development"
+                },
+                {
+                  "value": "Not decided yet",
+                  "label": "Not decided yet"
+                }
+              ]
+            },
+            {
+              "name": "contact_email",
+              "display_name": "Contact Email",
+              "help_text": "Who to contact about this habitat bank.",
+              "type": "text",
+              "required": false
+            }
+          ]
+        },
+        "location": {
+          "title": "Site Boundary",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Landowner / Habitat Bank",
+          "activity": "save_location_step",
+          "next": "feasibility",
+          "ui_mode": "location_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "locations",
+              "display_name": "Locations",
+              "help_text": "The boundary of the land being registered as a habitat bank. Draw it as one or more polygons on the map.",
+              "entry_help_text": {
+                "friendly_name": "A friendly name you choose for this area, such as “North field”, so you can tell several areas apart."
+              },
+              "type": "location_table",
+              "required": true
+            }
+          ]
+        },
+        "feasibility": {
+          "title": "Feasibility & Additionality Assessment",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Habitat Bank / Ecologist",
+          "activity": "save_bng_feasibility_step",
+          "next": "baseline_habitats",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "ecological_feasibility",
+              "display_name": "Ecological Feasibility",
+              "help_text": "Whether the planned habitats can realistically be created or improved here, given soils, hydrology and surroundings.",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "additionality",
+              "display_name": "Additionality",
+              "help_text": "Why the gains are additional: they must go beyond what the land is already required to deliver (for example by other schemes or legal obligations).",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "constraints",
+              "display_name": "Site Constraints",
+              "help_text": "Anything that limits what can be done, such as designations, access, rights of way or contamination.",
+              "type": "textarea",
+              "required": false
+            },
+            {
+              "name": "commercial_viability",
+              "display_name": "Commercial Viability",
+              "help_text": "Whether selling units is likely to cover the costs of creating and managing the habitats for 30 years.",
+              "type": "textarea",
+              "required": false
+            },
+            {
+              "name": "bng_eligible",
+              "display_name": "Eligible for BNG",
+              "help_text": "Your conclusion on whether the site is suitable to supply BNG units.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Yes",
+                  "label": "Yes"
+                },
+                {
+                  "value": "No",
+                  "label": "No"
+                },
+                {
+                  "value": "Uncertain",
+                  "label": "Uncertain"
+                }
+              ]
+            }
+          ]
+        },
+        "baseline_habitats": {
+          "title": "Baseline Assessment",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Ecologist",
+          "activity": "save_bng_baseline_habitats_step",
+          "next": "baseline_metric",
+          "ui_mode": "habitat_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "parcels",
+              "display_name": "Habitat parcels",
+              "help_text": "The habitats on the site today, from an ecological survey. Record each parcel of area habitat (hectares), hedgerow (km) and watercourse (km) with its condition. (Simplified prototype metric, not the Statutory Biodiversity Metric.)",
+              "type": "habitat_table",
+              "phase": "baseline",
+              "required": true
+            }
+          ]
+        },
+        "baseline_metric": {
+          "title": "Biodiversity Metric Assessment",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Ecologist",
+          "activity": "save_bng_baseline_metric_step",
+          "next": "habitat_design",
+          "ui_mode": "bng_metric",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "metric_notes",
+              "display_name": "Assessment Notes",
+              "help_text": "Anything to note about the baseline, such as survey dates or assumptions.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "habitat_design": {
+          "title": "Habitat Design",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Ecologist / Designer",
+          "activity": "save_bng_proposed_habitats_step",
+          "next": "hmmp",
+          "ui_mode": "habitat_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "parcels",
+              "display_name": "Habitat parcels",
+              "help_text": "The habitats the site will have once creation and enhancement works are complete. The uplift over the baseline is what the habitat bank can sell as units. (Simplified prototype metric, not the Statutory Biodiversity Metric.)",
+              "type": "habitat_table",
+              "phase": "proposed",
+              "required": true
+            }
+          ]
+        },
+        "hmmp": {
+          "title": "Habitat Management & Monitoring Plan",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Habitat Bank",
+          "activity": "save_bng_hmmp_step",
+          "next": "legal_security",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "management_period_years",
+              "display_name": "Management Period (years)",
+              "help_text": "How long the habitats will be managed and monitored. BNG requires at least 30 years.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "management_summary",
+              "display_name": "Management Summary",
+              "help_text": "How the habitats will be created and then maintained, for example grazing, cutting or planting regimes.",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "monitoring_frequency",
+              "display_name": "Monitoring Frequency",
+              "help_text": "How often progress will be monitored and reported.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Years 1, 2, 5 and then every 5 years",
+                  "label": "Years 1, 2, 5 and then every 5 years"
+                },
+                {
+                  "value": "Every year",
+                  "label": "Every year"
+                },
+                {
+                  "value": "Every 2 years",
+                  "label": "Every 2 years"
+                },
+                {
+                  "value": "Other",
+                  "label": "Other"
+                }
+              ]
+            },
+            {
+              "name": "reporting_obligations",
+              "display_name": "Reporting Obligations",
+              "help_text": "What will be reported, to whom and when.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "legal_security": {
+          "title": "Legal Security",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Legal / LPA / Responsible Body",
+          "activity": "save_bng_legal_security_step",
+          "next": "gain_site_register",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "agreement_type",
+              "display_name": "Agreement Type",
+              "help_text": "The legal agreement that secures the habitats for at least 30 years.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Section 106 agreement",
+                  "label": "Section 106 agreement"
+                },
+                {
+                  "value": "Conservation covenant",
+                  "label": "Conservation covenant"
+                }
+              ]
+            },
+            {
+              "name": "agreement_reference",
+              "display_name": "Agreement Reference",
+              "help_text": "The reference of the signed agreement.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "agreement_date",
+              "display_name": "Agreement Date",
+              "help_text": "When the agreement was signed. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "responsible_body",
+              "display_name": "Responsible Body",
+              "help_text": "The local planning authority or responsible body that holds the agreement.",
+              "type": "text",
+              "required": false
+            }
+          ]
+        },
+        "gain_site_register": {
+          "title": "Biodiversity Gain Site Register",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Habitat Bank / Platform",
+          "activity": "save_bng_gain_site_register_step",
+          "next": null,
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "register_reference",
+              "display_name": "Register Reference",
+              "help_text": "The site's reference on Natural England's biodiversity gain sites register.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "registration_date",
+              "display_name": "Registration Date",
+              "help_text": "When the site was added to the register. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "register_notes",
+              "display_name": "Notes",
+              "help_text": "Anything else about the registration.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        }
+      }
+    },
+    "bng_development_v1": {
+      "code": "bng_development_v1",
+      "name": "BNG Development",
+      "start_step": "consent",
+      "steps": {
+        "consent": {
+          "title": "Data Collection and Sharing",
+          "activity": "save_consent_step",
+          "next": "basic_info",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "disclaimer_text",
+              "display_name": "Disclaimer",
+              "type": "content",
+              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+            },
+            {
+              "name": "disclaimer_acknowledged",
+              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "type": "checkbox",
+              "required": true
+            },
+            {
+              "name": "allow_data_sharing",
+              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "type": "checkbox",
+              "required": true
+            }
+          ],
+          "stage": "Developer / Planning",
+          "actor": "Developer"
+        },
+        "basic_info": {
+          "title": "Development Name and Description",
+          "stage": "Developer / Planning",
+          "actor": "Developer",
+          "activity": "save_basic_info_step",
+          "next": "development_details",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "name",
+              "display_name": "Development Name",
+              "help_text": "A short name that identifies this development across the platform, for example in the project list.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "high_level_description",
+              "display_name": "Description",
+              "help_text": "A brief summary of the development: what it involves, where it is and what it aims to achieve.",
+              "type": "textarea",
+              "required": true
+            }
+          ]
+        },
+        "development_details": {
+          "title": "Development Details",
+          "stage": "Developer / Planning",
+          "actor": "Developer",
+          "activity": "save_bng_development_details_step",
+          "next": "location",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "planning_authority",
+              "display_name": "Local Planning Authority",
+              "help_text": "The council that will decide the planning application.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "development_type",
+              "display_name": "Development Type",
+              "help_text": "The main kind of development.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Residential",
+                  "label": "Residential"
+                },
+                {
+                  "value": "Commercial",
+                  "label": "Commercial"
+                },
+                {
+                  "value": "Infrastructure",
+                  "label": "Infrastructure"
+                },
+                {
+                  "value": "Mixed use",
+                  "label": "Mixed use"
+                },
+                {
+                  "value": "Other",
+                  "label": "Other"
+                }
+              ]
+            },
+            {
+              "name": "planning_reference",
+              "display_name": "Planning Reference",
+              "help_text": "The planning application reference, if one exists yet.",
+              "type": "text",
+              "required": false
+            }
+          ]
+        },
+        "location": {
+          "title": "Development Site",
+          "stage": "Developer / Planning",
+          "actor": "Developer",
+          "activity": "save_location_step",
+          "next": "development_baseline",
+          "ui_mode": "location_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "locations",
+              "display_name": "Locations",
+              "help_text": "The boundary of the development site. Draw it as one or more polygons on the map.",
+              "entry_help_text": {
+                "friendly_name": "A friendly name you choose for this area, such as “North field”, so you can tell several areas apart."
+              },
+              "type": "location_table",
+              "required": true
+            }
+          ]
+        },
+        "development_baseline": {
+          "title": "Development Baseline Assessment",
+          "stage": "Developer / Planning",
+          "actor": "Developer / Ecologist",
+          "activity": "save_bng_baseline_habitats_step",
+          "next": "development_proposal",
+          "ui_mode": "habitat_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "parcels",
+              "display_name": "Habitat parcels",
+              "help_text": "The habitats on the development site before any works, from an ecological survey. (Simplified prototype metric, not the Statutory Biodiversity Metric.)",
+              "type": "habitat_table",
+              "phase": "baseline",
+              "required": true
+            }
+          ]
+        },
+        "development_proposal": {
+          "title": "Development Metric Assessment",
+          "stage": "Developer / Planning",
+          "actor": "Ecologist",
+          "activity": "save_bng_proposed_habitats_step",
+          "next": "mitigation_hierarchy",
+          "ui_mode": "habitat_table",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "parcels",
+              "display_name": "Habitat parcels",
+              "help_text": "The habitats that will be on the site after development, including any created or enhanced on-site. Compared with the baseline, this shows the losses and the gain still needed. (Simplified prototype metric, not the Statutory Biodiversity Metric.)",
+              "type": "habitat_table",
+              "phase": "proposed",
+              "required": true
+            }
+          ]
+        },
+        "mitigation_hierarchy": {
+          "title": "Mitigation Hierarchy Review",
+          "stage": "Developer / Planning",
+          "actor": "Developer / Ecologist",
+          "activity": "save_bng_mitigation_hierarchy_step",
+          "next": "onsite_decision",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "avoid",
+              "display_name": "Avoid",
+              "help_text": "How the design avoids harm to habitats, for example by keeping valuable areas out of the development.",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "minimise",
+              "display_name": "Minimise",
+              "help_text": "How unavoidable harm is reduced.",
+              "type": "textarea",
+              "required": true
+            },
+            {
+              "name": "restore",
+              "display_name": "Restore",
+              "help_text": "How damaged habitats will be restored on-site.",
+              "type": "textarea",
+              "required": false
+            },
+            {
+              "name": "residual_impacts",
+              "display_name": "Residual Impacts",
+              "help_text": "Harm that remains after avoiding, minimising and restoring, which must be compensated.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "onsite_decision": {
+          "title": "On-Site BNG Decision",
+          "stage": "Developer / Planning",
+          "actor": "Developer / LPA",
+          "activity": "save_bng_onsite_decision_step",
+          "next": "offsite_allocation",
+          "ui_mode": "bng_metric",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "onsite_decision",
+              "display_name": "Decision",
+              "help_text": "Whether the 10% net gain can be met on-site, or off-site units are needed for the shortfall shown above.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "10% net gain achieved on-site",
+                  "label": "10% net gain achieved on-site"
+                },
+                {
+                  "value": "Off-site units required",
+                  "label": "Off-site units required"
+                }
+              ]
+            },
+            {
+              "name": "decision_notes",
+              "display_name": "Notes",
+              "help_text": "The reasons for the decision.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "offsite_allocation": {
+          "title": "Off-Site Unit Allocation",
+          "stage": "Developer / Planning",
+          "actor": "Developer / Platform",
+          "activity": "save_bng_offsite_allocation_step",
+          "next": "planning_application",
+          "ui_mode": "bng_allocation",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "allocations",
+              "display_name": "Off-site units",
+              "type": "bng_allocation",
+              "required": false,
+              "help_text": "Units taken from registered habitat banks to cover the shortfall. Units allocated here are no longer available to other developments."
+            }
+          ]
+        },
+        "planning_application": {
+          "title": "Planning Application",
+          "stage": "Developer / Planning",
+          "actor": "Developer",
+          "activity": "save_bng_planning_application_step",
+          "next": "planning_permission",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "application_reference",
+              "display_name": "Application Reference",
+              "help_text": "The planning application reference.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "submission_date",
+              "display_name": "Submission Date",
+              "help_text": "When the application was submitted. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "bng_documents",
+              "display_name": "BNG Documents Submitted",
+              "help_text": "The ecological reports, metric and BNG proposals submitted with the application.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "planning_permission": {
+          "title": "Planning Permission Granted",
+          "stage": "Developer / Planning",
+          "actor": "Local Planning Authority",
+          "activity": "save_bng_planning_permission_step",
+          "next": "gain_condition",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "decision",
+              "display_name": "Decision",
+              "help_text": "The planning authority's decision.",
+              "type": "select",
+              "required": true,
+              "options": [
+                {
+                  "value": "Granted",
+                  "label": "Granted"
+                },
+                {
+                  "value": "Granted with conditions",
+                  "label": "Granted with conditions"
+                },
+                {
+                  "value": "Refused",
+                  "label": "Refused"
+                }
+              ]
+            },
+            {
+              "name": "decision_date",
+              "display_name": "Decision Date",
+              "help_text": "When the decision was issued. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "conditions_summary",
+              "display_name": "Conditions",
+              "help_text": "A summary of any conditions attached to the permission.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "gain_condition": {
+          "title": "Biodiversity Gain Condition",
+          "stage": "Developer / Planning",
+          "actor": "Local Planning Authority",
+          "activity": "save_bng_gain_condition_step",
+          "next": "gain_plan_approval",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "condition_reference",
+              "display_name": "Condition Reference",
+              "help_text": "The reference of the statutory pre-commencement biodiversity gain condition.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "condition_notes",
+              "display_name": "Notes",
+              "help_text": "Anything else about the condition.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "gain_plan_approval": {
+          "title": "Biodiversity Gain Plan Approval",
+          "stage": "Developer / Planning",
+          "actor": "Local Planning Authority",
+          "activity": "save_bng_gain_plan_approval_step",
+          "next": "commencement",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "gain_plan_reference",
+              "display_name": "Gain Plan Reference",
+              "help_text": "The reference of the approved biodiversity gain plan.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "approval_date",
+              "display_name": "Approval Date",
+              "help_text": "When the gain plan was approved. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": false
+            },
+            {
+              "name": "approval_notes",
+              "display_name": "Notes",
+              "help_text": "Anything else about the approval.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "commencement": {
+          "title": "Development Commencement",
+          "stage": "Developer / Planning",
+          "actor": "Developer",
+          "activity": "save_bng_commencement_step",
+          "next": null,
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "commencement_date",
+              "display_name": "Commencement Date",
+              "help_text": "When development started on site. Use the format YYYY-MM-DD.",
+              "type": "text",
+              "required": true
+            },
+            {
+              "name": "commencement_notes",
+              "display_name": "Notes",
+              "help_text": "Anything else about the start of works.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        }
+      }
     }
   }
 }
