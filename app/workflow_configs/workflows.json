@@ -21,12 +21,14 @@
               {
                 "name": "disclaimer_acknowledged",
                 "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+                "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
                 "type": "checkbox",
                 "required": true
               },
               {
                 "name": "allow_data_sharing",
                 "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+                "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
                 "type": "checkbox",
                 "required": true
               }
@@ -42,12 +44,14 @@
             {
               "name": "name",
               "display_name": "Project Name",
+              "help_text": "A short name that identifies this project across the platform, for example in the project list.",
               "type": "text",
               "required": true
             },
             {
               "name": "high_level_description",
               "display_name": "Description",
+              "help_text": "A brief summary of the project: what it involves, where it takes place and what it aims to achieve for nature.",
               "type": "textarea",
               "required": true
             }
@@ -63,6 +67,10 @@
             {
               "name": "locations",
               "display_name": "Locations",
+              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically, and each polygon is used to assess its biodiversity risk in the Vulnerability Index.",
+              "entry_help_text": {
+                "friendly_name": "A friendly name you choose for this location, such as “North field” or “Riverside plot”, so you can tell your sites apart when a project has several. It’s used to label the location on the project dashboard and in the Vulnerability Index."
+              },
               "type": "location_table",
               "required": true
             }
@@ -78,12 +86,14 @@
             {
               "name": "loan_amount",
               "display_name": "Loan Amount",
+              "help_text": "The total loan amount requested, in the currency selected below.",
               "type": "number",
               "required": true
             },
             {
               "name": "currency",
               "display_name": "Currency",
+              "help_text": "The currency used for the amounts in this step.",
               "type": "select",
               "required": true,
               "default": "EUR",
@@ -92,6 +102,7 @@
             {
               "name": "use_of_proceeds_id",
               "display_name": "Use of Proceeds",
+              "help_text": "What the money will mainly be spent on, for example farm machinery, working capital or land purchase.",
               "type": "select",
               "required": true,
               "options_source": "use_of_proceeds"
@@ -99,12 +110,14 @@
             {
               "name": "nature_positive_percentage",
               "display_name": "Nature Positive Percentage",
+              "help_text": "The share of the loan, from 0 to 100%, that goes to activities with a positive impact on nature, such as habitat restoration or more sustainable land management.",
               "type": "number",
               "required": true
             },
             {
               "name": "notes",
               "display_name": "Notes",
+              "help_text": "Anything else about the financing that reviewers should know.",
               "type": "textarea",
               "required": false
             }
@@ -120,24 +133,28 @@
             {
               "name": "organic_farmer_number",
               "display_name": "Organic Farmer Number",
+              "help_text": "The farm's organic certification or registration number, if it is certified organic.",
               "type": "text",
               "required": false
             },
             {
               "name": "environment_scheme_number",
               "display_name": "Environment Scheme Number",
+              "help_text": "Your agreement or reference number in an agri-environment or nature scheme, if you take part in one.",
               "type": "text",
               "required": false
             },
             {
               "name": "subsidy_reference",
               "display_name": "Subsidy Reference",
+              "help_text": "The reference of any public subsidy or grant linked to this land or project.",
               "type": "text",
               "required": false
             },
             {
               "name": "registry_notes",
               "display_name": "Registry Notes",
+              "help_text": "Extra context about the identifiers above, for example which registry or scheme each one belongs to.",
               "type": "textarea",
               "required": false
             }
@@ -153,12 +170,14 @@
             {
               "name": "assignments",
               "display_name": "Intermediary Assignments",
+              "help_text": "The organisations supporting this project and the role each one plays. Add one row per intermediary and function; an intermediary can hold more than one function.",
               "type": "assignment_table",
               "required": true,
               "row_fields": [
                 {
                   "name": "intermediary_id",
                   "display_name": "Intermediary",
+                  "help_text": "An organisation registered on the platform that supports the project, for example by designing the transaction, recruiting investors or coordinating restoration work.",
                   "type": "select",
                   "required": true,
                   "options_source": "intermediary"
@@ -166,6 +185,7 @@
                 {
                   "name": "intermediary_function_id",
                   "display_name": "Function",
+                  "help_text": "The role this intermediary plays in the project. Only the functions registered for the chosen intermediary are listed.",
                   "type": "select",
                   "required": true,
                   "options_source": "intermediary_function",
@@ -198,12 +218,14 @@
               {
                 "name": "disclaimer_acknowledged",
                 "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
+                "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
                 "type": "checkbox",
                 "required": true
               },
               {
                 "name": "allow_data_sharing",
                 "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
+                "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
                 "type": "checkbox",
                 "required": true
               }
@@ -219,12 +241,14 @@
             {
               "name": "name",
               "display_name": "Name",
+              "help_text": "A short name that identifies this project across the platform, for example in the project list.",
               "type": "text",
               "required": true
             },
             {
               "name": "high_level_description",
               "display_name": "Description",
+              "help_text": "A brief summary of the project: what it involves, where it takes place and what it aims to achieve for nature.",
               "type": "textarea",
               "required": true
             }
@@ -240,6 +264,8 @@
             {
               "name": "financing_type_id",
               "display_name": "Financing Type",
+              "help_text": "How the project will be financed: private, public, hybrid or blended finance, or philanthropic funding.",
+              "describe_options": true,
               "type": "select",
               "required": true,
               "options_source": "financing_type"
@@ -256,6 +282,10 @@
             {
               "name": "locations",
               "display_name": "Locations",
+              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically, and each polygon is used to assess its biodiversity risk in the Vulnerability Index.",
+              "entry_help_text": {
+                "friendly_name": "A friendly name you choose for this location, such as “North field” or “Riverside plot”, so you can tell your sites apart when a project has several. It’s used to label the location on the project dashboard and in the Vulnerability Index."
+              },
               "type": "location_table",
               "required": true
             }
@@ -271,6 +301,8 @@
             {
               "name": "nbs_type_id",
               "display_name": "NbS Type",
+              "help_text": "The main kind of nature-based solution (NbS) the project delivers, for example agroforestry, wetland restoration or reforestation.",
+              "describe_options": true,
               "type": "select",
               "required": true,
               "options_source": "nbs_type"
@@ -278,6 +310,8 @@
             {
               "name": "implementation_stage_id",
               "display_name": "Implementation Stage",
+              "help_text": "How far along the project is, from concept and feasibility through pilot and scaling to operational and maintenance.",
+              "describe_options": true,
               "type": "select",
               "required": false,
               "options_source": "implementation_stage"
@@ -285,6 +319,8 @@
             {
               "name": "nbs_environment_type_id",
               "display_name": "NbS Environment Type",
+              "help_text": "The type of ecosystem the solution is in, for example cropland, forest, grassland, wetland, rivers and lakes, coastal or urban.",
+              "describe_options": true,
               "type": "select",
               "required": false,
               "options_source": "nbs_environment_type"
@@ -292,6 +328,8 @@
             {
               "name": "nbs_approach_type_id",
               "display_name": "NbS Approach Type",
+              "help_text": "The overall approach the solution takes, for example ecological restoration, green infrastructure or ecosystem-based adaptation.",
+              "describe_options": true,
               "type": "select",
               "required": false,
               "options_source": "nbs_approach_type"
@@ -299,6 +337,8 @@
             {
               "name": "nbs_intervention_type_id",
               "display_name": "NbS Intervention Type",
+              "help_text": "The specific kind of intervention, for example protecting and conserving ecosystems, managing agricultural landscapes or restoring degraded ecosystems.",
+              "describe_options": true,
               "type": "select",
               "required": false,
               "options_source": "nbs_intervention_type"
@@ -306,6 +346,8 @@
             {
               "name": "nbs_societal_challenge_type_id",
               "display_name": "NbS Societal Challenge Type",
+              "help_text": "The main societal challenge the solution helps address, for example climate resilience, water management, food security or human health.",
+              "describe_options": true,
               "type": "select",
               "required": false,
               "options_source": "nbs_societal_challenge_type"
@@ -313,6 +355,7 @@
             {
               "name": "nbs_description",
               "display_name": "NbS Description",
+              "help_text": "Describe the solution in your own words: what will be done on the ground and how it benefits nature and people.",
               "type": "textarea",
               "required": false
             }
@@ -328,12 +371,14 @@
             {
               "name": "funding_amount",
               "display_name": "Funding Amount",
+              "help_text": "The total funding the project needs. It must equal direct funding plus indirect funding.",
               "type": "number",
               "required": true
             },
             {
               "name": "currency",
               "display_name": "Currency",
+              "help_text": "The currency used for the amounts in this step.",
               "type": "select",
               "required": true,
               "default": "EUR",
@@ -342,30 +387,35 @@
             {
               "name": "upfront_costs",
               "display_name": "Upfront Costs",
+              "help_text": "One-off costs to set the project up, such as land preparation, planting or construction.",
               "type": "number",
               "required": false
             },
             {
               "name": "maintenance_costs",
               "display_name": "Maintenance Costs",
+              "help_text": "Ongoing costs to keep the solution working over time, such as monitoring, upkeep and management.",
               "type": "number",
               "required": false
             },
             {
               "name": "direct_funding_amount",
               "display_name": "Direct Funding",
+              "help_text": "Funding that goes directly to the project. Direct plus indirect funding must add up to the funding amount.",
               "type": "number",
               "required": false
             },
             {
               "name": "indirect_funding_amount",
               "display_name": "Indirect Funding",
+              "help_text": "Funding that supports the project indirectly, for example through partners or linked programmes. Direct plus indirect funding must add up to the funding amount.",
               "type": "number",
               "required": false
             },
             {
               "name": "funding_notes",
               "display_name": "Funding Notes",
+              "help_text": "Anything else about the funding needs, such as timing, phasing or conditions.",
               "type": "textarea",
               "required": false
             }
@@ -381,18 +431,21 @@
             {
               "name": "nature_positive_benefits",
               "display_name": "Nature Positive Benefits",
+              "help_text": "The benefits for nature the project is expected to deliver, for example more habitat, species or ecosystem services. Be as specific and measurable as you can.",
               "type": "textarea",
               "required": true
             },
             {
               "name": "legislation_compliance",
               "display_name": "Legislation Adherence",
+              "help_text": "How the project meets or goes beyond relevant laws and standards, such as environmental or land-use regulations.",
               "type": "textarea",
               "required": false
             },
             {
               "name": "additional_rationale",
               "display_name": "Additional Rationale",
+              "help_text": "Any other reasons an investor should support this project, such as social benefits, co-funding or track record.",
               "type": "textarea",
               "required": false
             }
@@ -408,12 +461,14 @@
             {
               "name": "supporting_document",
               "display_name": "Supporting documents, proof of meeting standards",
+              "help_text": "Upload evidence that supports the application, such as certificates, surveys, plans or proof of meeting relevant standards.",
               "type": "file",
               "required": true
             },
             {
               "name": "document_notes",
               "display_name": "Document Notes",
+              "help_text": "Explain what the uploaded document is and what it shows.",
               "type": "textarea",
               "required": false
             }
