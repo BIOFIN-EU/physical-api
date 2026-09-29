@@ -30,8 +30,18 @@ from app.models.bng import (
 )
 from app.models.case_data import Case, CaseBasicInfo, CaseLocation
 from app.schemas.bng import HabitatParcelInput
-from app.services.bng_finance import bank_financials, delivery_cost_from_step, prices_from_step
+from app.services.bng_finance import (
+    SHARE_FIELDS,
+    bank_financials,
+    delivery_cost_from_step,
+    prices_from_step,
+    revenue_distribution,
+    shares_from_step,
+    split,
+)
 from app.services.bng_metric import ParcelUnits, parcel_units, summarise
+from app.services.bng_monitoring import bank_reports, monitoring_summary
+from app.services.bng_roles import case_signoffs
 
 UNIT_COLUMN = {
     "area": "habitat_units",
@@ -108,8 +118,20 @@ def _serialize_transaction(transaction: BngTransaction, names: dict[int, str | N
         "hedgerow_units": float(transaction.hedgerow_units),
         "watercourse_units": float(transaction.watercourse_units),
         "total_price": _float_or_none(transaction.total_price),
+        "shares": _transaction_shares_json(transaction),
+        "split": split(transaction.total_price, _transaction_shares(transaction)),
         "created_at": transaction.created_at.isoformat() if transaction.created_at else None,
     }
+
+
+def _transaction_shares(transaction: BngTransaction) -> dict[str, Decimal] | None:
+    shares = {party: getattr(transaction, field) for party, field in SHARE_FIELDS.items()}
+    return None if any(share is None for share in shares.values()) else shares
+
+
+def _transaction_shares_json(transaction: BngTransaction) -> dict[str, float] | None:
+    shares = _transaction_shares(transaction)
+    return None if shares is None else {party: float(share) for party, share in shares.items()}
 
 
 async def _parcels(db: AsyncSession, case_id: int) -> list[BngHabitatParcel]:
@@ -209,12 +231,21 @@ async def _uplift(db: AsyncSession, case_id: int) -> dict[str, Decimal]:
 async def bank_finances(db: AsyncSession, case: Case) -> dict[str, Any]:
     pricing = await _step_data(db, case.id, BNG_PRICING_STEP)
     rows = await _allocation_rows(db, case)
-    return bank_financials(
+    financials = bank_financials(
         prices=prices_from_step(pricing),
         delivery_cost=delivery_cost_from_step(pricing),
         uplift=await _uplift(db, case.id),
         by_status={status: _sum(rows, (status,)) for status in ACTIVE_ALLOCATION_STATUSES},
     )
+    shares = shares_from_step(pricing)
+    transactions = (await db.execute(
+        select(BngTransaction).where(BngTransaction.habitat_bank_case_id == case.id)
+    )).scalars().all()
+    financials["revenue_shares"] = None if shares is None else {party: float(v) for party, v in shares.items()}
+    financials["revenue_distribution"] = revenue_distribution(
+        [(t.total_price, _transaction_shares(t)) for t in transactions]
+    )
+    return financials
 
 
 async def _names(db: AsyncSession, case_ids: set[int]) -> dict[int, str | None]:
@@ -224,6 +255,10 @@ async def _names(db: AsyncSession, case_ids: set[int]) -> dict[int, str | None]:
         select(CaseBasicInfo.case_id, CaseBasicInfo.name).where(CaseBasicInfo.case_id.in_(case_ids))
     )
     return dict(result.all())
+
+
+async def case_name(db: AsyncSession, case_id: int) -> str | None:
+    return (await _names(db, {case_id})).get(case_id)
 
 
 async def case_allocations(db: AsyncSession, case: Case) -> list[dict[str, Any]]:
@@ -283,6 +318,9 @@ async def add_bng_sections(
 
     payload["bng_transactions"] = await case_transactions(db, case)
     payload["bng_metric"] = await case_metric(db, case)
+    payload["bng_signoffs"] = await case_signoffs(db, case.id)
+    if case.case_type == BNG_HABITAT_BANK_WORKFLOW:
+        payload["bng_monitoring"] = monitoring_summary(await bank_reports(db, case))
 
 
 async def available_habitat_banks(db: AsyncSession) -> list[dict[str, Any]]:

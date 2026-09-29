@@ -7,7 +7,7 @@ errors and created_by / updated_by work exactly as for other steps.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -31,7 +31,7 @@ from app.models.bng import (
 )
 from app.models.case_data import Case
 from app.schemas.bng import HabitatParcelsStepInput, UnitAllocationStepInput
-from app.services.bng_finance import prices_from_step, total_price
+from app.services.bng_finance import SHARE_FIELDS, prices_from_step, shares_error, shares_from_step, total_price
 from app.services.bng_metric import ParcelUnits, parcel_units, summarise
 from app.workflows.activities import (
     SessionLocal,
@@ -50,7 +50,6 @@ BNG_FORM_STEPS = (
     "feasibility",
     "baseline_metric",
     "hmmp",
-    "unit_pricing",
     "legal_security",
     "gain_site_register",
     # Development
@@ -61,8 +60,8 @@ BNG_FORM_STEPS = (
     "gain_condition",
     "commencement",
 )
-# planning_permission and gain_plan_approval are form steps too, but also move
-# the development's units along their lifecycle (see below).
+# unit_pricing, planning_permission and gain_plan_approval are form steps too,
+# with extra checks or changes to other records (see below).
 
 _UNIT_COLUMN = {
     "area": "habitat_units",
@@ -93,6 +92,22 @@ def _answers(data: dict) -> dict:
     return answers
 
 
+def _check_dates(answers: dict) -> None:
+    """Date fields (named *_date) hold an ISO date, YYYY-MM-DD, or nothing."""
+    errors = {}
+    for key, value in answers.items():
+        if not key.endswith("_date") or value in (None, ""):
+            continue
+        try:
+            if not (isinstance(value, str) and len(value) == 10):
+                raise ValueError
+            date.fromisoformat(value)
+        except ValueError:
+            errors[key] = "Enter a valid date."
+    if errors:
+        _raise_validation_error("Please correct the highlighted fields.", errors)
+
+
 def _make_form_step_activity(step_code: str, after_save=None):
     """
     A form step storing its answers. `after_save(session, case_id, answers)`
@@ -103,6 +118,7 @@ def _make_form_step_activity(step_code: str, after_save=None):
         actor = _pop_actor(data)
         answers = _answers(data)
         _log_activity_payload(f"save_bng_{step_code}_step", case_id, answers)
+        _check_dates(answers)
 
         with SessionLocal() as session:
             _begin_user_write(session, case_id, actor)
@@ -370,6 +386,16 @@ def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
         _commit_or_raise(session)
 
 
+def _check_revenue_shares(session, case_id: int, answers: dict) -> None:
+    """Unit pricing: the revenue split must add up to 100% (step 31)."""
+    error = shares_error(answers)
+    if error:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {SHARE_FIELDS["landowner"]: error},
+        )
+
+
 PERMISSION_GRANTED = ("Granted", "Granted with conditions")
 
 
@@ -440,6 +466,13 @@ def _retire_on_gain_plan_approval(session, case_id: int, answers: dict) -> None:
     for row in rows:
         row.status = "retired"
         row.retired_at = now
+        # The bank's revenue split at the time of sale, kept with the record.
+        shares = shares_from_step(session.execute(
+            select(BngStepData.data).where(
+                BngStepData.case_id == row.habitat_bank_case_id,
+                BngStepData.step_code == BNG_PRICING_STEP,
+            )
+        ).scalar_one_or_none()) or {}
         session.add(
             BngTransaction(
                 reference=f"BNG-{now.year}-{row.id:06d}",
@@ -450,6 +483,7 @@ def _retire_on_gain_plan_approval(session, case_id: int, answers: dict) -> None:
                 hedgerow_units=row.hedgerow_units,
                 watercourse_units=row.watercourse_units,
                 total_price=row.total_price,
+                **{field: shares.get(party) for party, field in SHARE_FIELDS.items()},
             )
         )
 
@@ -462,6 +496,9 @@ BNG_ACTIVITIES = {
     "save_bng_baseline_habitats_step": _make_habitat_parcels_activity("baseline"),
     "save_bng_proposed_habitats_step": _make_habitat_parcels_activity("proposed"),
     "save_bng_offsite_allocation_step": save_bng_offsite_allocation_step,
+    "save_bng_unit_pricing_step": _make_form_step_activity(
+        "unit_pricing", after_save=_check_revenue_shares
+    ),
     "save_bng_planning_permission_step": _make_form_step_activity(
         "planning_permission", after_save=_allocate_on_permission
     ),

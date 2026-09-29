@@ -94,6 +94,16 @@ class ConfigDrivenCaseWorkflow:
 
                 step_config = self._get_step_config(step_name)
 
+                # An approval step that is rejected goes back to an earlier
+                # step without saving anything (steps with "approval" only).
+                if self._is_rejection(step_config, payload):
+                    self.current_step = self._rejection_target(step_config)
+                    self.status = "in_progress"
+                    self.validation_errors = {}
+                    self.system_error = None
+                    await self._persist_state()
+                    continue
+
                 errors = self._validate_required_fields(step_config, payload)
                 if errors:
                     self.validation_errors = errors
@@ -308,6 +318,30 @@ class ConfigDrivenCaseWorkflow:
                 return target
 
         return step_config.get("next")
+
+    def _is_rejection(
+        self,
+        step_config: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> bool:
+        """
+        A step configured as an approval, submitted with "_decision":
+        "rejected". Other steps never are, whatever the payload.
+
+            "approval": {"reject_to": "planning_application"}
+        """
+        return (
+            isinstance(step_config.get("approval"), dict)
+            and payload.get("_decision") == "rejected"
+        )
+
+    def _rejection_target(self, step_config: dict[str, Any]) -> str:
+        target = step_config["approval"].get("reject_to")
+        if not isinstance(target, str) or target not in self.workflow_config.get("steps", {}):
+            self._raise_configuration_error(
+                f"approval.reject_to points to unknown step '{target}'."
+            )
+        return target
 
     def _get_required_step_value(
         self,

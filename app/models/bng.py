@@ -6,11 +6,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from datetime import date
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import (
     DDL,
+    Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -22,6 +26,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -52,6 +57,41 @@ ACTIVE_ALLOCATION_STATUSES = ("requested", "reserved", "allocated", "retired")
 ACCEPTED_ALLOCATION_STATUSES = ("reserved", "allocated", "retired")
 # Can no longer be changed or released.
 LOCKED_ALLOCATION_STATUSES = ("allocated", "retired")
+
+# Roles a user can hold on a BNG project (Phase 3), several per user. They
+# decide which steps a user may submit (the step's "roles" in the workflow
+# config); case_user_access still decides whether they can open the project.
+BNG_ROLES = ("landowner", "investor", "developer", "ecologist", "lpa")
+BNG_ROLE_LABELS = {
+    "landowner": "Landowner / Habitat Bank",
+    "investor": "Investor",
+    "developer": "Developer",
+    "ecologist": "Ecologist",
+    "lpa": "Local Planning Authority",
+}
+# The role the creator of a new BNG project gets.
+BNG_CREATOR_ROLE = {
+    BNG_HABITAT_BANK_WORKFLOW: "landowner",
+    BNG_DEVELOPMENT_WORKFLOW: "developer",
+}
+
+# How a step was signed off (bng_step_signoffs.decision).
+SIGNOFF_DECISIONS = ("submitted", "approved", "rejected", "edited")
+
+# Monitoring (diagram steps 27-32): reports due this many years after the
+# habitat bank is registered.
+MONITORING_YEARS = (1, 2, 5, 10, 15, 20, 25, 30)
+MONITORING_STATUSES = ("due", "submitted", "passed", "failed", "remediated")
+REMEDIAL_STATUSES = ("open", "completed")
+# Roles that verify monitoring reports.
+VERIFIER_ROLES = ("ecologist", "lpa")
+
+# Revenue split (unit_pricing step): share of each transaction per party.
+REVENUE_SHARE_FIELDS = {
+    "landowner": "landowner_share_percent",
+    "investor": "investor_share_percent",
+    "manager": "manager_share_percent",
+}
 
 _CATEGORY_CHECK = "category IN ('area', 'hedgerow', 'watercourse')"
 
@@ -283,10 +323,172 @@ class BngTransaction(ActorStampMixin, Base):
     hedgerow_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     watercourse_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     total_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+    # Revenue split of the bank when the transaction was made (percent).
+    landowner_share_percent: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    investor_share_percent: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
+    manager_share_percent: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# ---------------------------------------------------------
+# Roles and sign-offs (Phase 3)
+# ---------------------------------------------------------
+
+class BngCaseRole(ActorStampMixin, Base):
+    """One BNG role of a user on a project (a user can have several)."""
+
+    __tablename__ = "bng_case_roles"
+    __table_args__ = (
+        UniqueConstraint("case_id", "user_id", "role", name="uq_bng_case_roles_case_user_role"),
+        CheckConstraint(
+            "role IN ('landowner', 'investor', 'developer', 'ecologist', 'lpa')",
+            name="ck_bng_case_roles_role",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class BngStepSignoff(Base):
+    """
+    Who submitted, approved, rejected or edited a BNG step, and in which
+    role: either their own, or recorded on behalf of another role (e.g. the
+    developer recording the LPA's decision). Append-only history.
+    """
+
+    __tablename__ = "bng_step_signoffs"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('submitted', 'approved', 'rejected', 'edited')",
+            name="ck_bng_step_signoffs_decision",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    step_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    # The role the step was signed off as (the user's own, or on behalf of).
+    role: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    on_behalf: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    comment: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------
+# Monitoring, verification and remedial actions (Phase 3)
+# ---------------------------------------------------------
+
+class BngMonitoringReport(ActorStampMixin, Base):
+    """
+    A monitoring report of a registered habitat bank (diagram steps 27-28),
+    due in one of MONITORING_YEARS, submitted by the bank and verified by an
+    ecologist or the LPA (step 29).
+    """
+
+    __tablename__ = "bng_monitoring_reports"
+    __table_args__ = (
+        UniqueConstraint("habitat_bank_case_id", "year", name="uq_bng_monitoring_reports_bank_year"),
+        CheckConstraint(
+            "status IN ('due', 'submitted', 'passed', 'failed', 'remediated')",
+            name="ck_bng_monitoring_reports_status",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    habitat_bank_case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="due")
+
+    # Submitted by the habitat bank
+    habitats_on_track: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    condition_summary: Mapped[Optional[str]] = mapped_column(String(4000), nullable=True)
+    management_carried_out: Mapped[Optional[str]] = mapped_column(String(4000), nullable=True)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_by: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    submitted_on_behalf: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Verified by an ecologist or the LPA
+    verification_notes: Mapped[Optional[str]] = mapped_column(String(4000), nullable=True)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_by: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    verified_as: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    verified_on_behalf: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    remedial_actions: Mapped[list["BngRemedialAction"]] = relationship(
+        back_populates="report", order_by="BngRemedialAction.id", cascade="all, delete-orphan"
+    )
+
+
+class BngRemedialAction(ActorStampMixin, Base):
+    """Work required after a failed monitoring report (diagram step 30)."""
+
+    __tablename__ = "bng_remedial_actions"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'completed')", name="ck_bng_remedial_actions_status"),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.bng_monitoring_reports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    description: Mapped[str] = mapped_column(String(4000), nullable=False)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
+    completion_notes: Mapped[Optional[str]] = mapped_column(String(4000), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    report: Mapped[BngMonitoringReport] = relationship(back_populates="remedial_actions")
 
 
 # ---------------------------------------------------------

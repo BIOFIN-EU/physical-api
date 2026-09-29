@@ -510,7 +510,11 @@
             }
           ],
           "stage": "Habitat Bank / Landowner",
-          "actor": "Landowner / Habitat Bank"
+          "actor": "Landowner / Habitat Bank",
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         },
         "basic_info": {
           "title": "Habitat Bank Name and Description",
@@ -535,7 +539,11 @@
               "type": "textarea",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         },
         "site_registration": {
           "title": "Site Registration",
@@ -609,7 +617,11 @@
               "type": "text",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         },
         "location": {
           "title": "Site Boundary",
@@ -630,7 +642,11 @@
               "type": "location_table",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         },
         "feasibility": {
           "title": "Feasibility & Additionality Assessment",
@@ -690,7 +706,12 @@
                 }
               ]
             }
-          ]
+          ],
+          "roles": [
+            "landowner",
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "baseline_habitats": {
           "title": "Baseline Assessment",
@@ -709,7 +730,11 @@
               "phase": "baseline",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "baseline_metric": {
           "title": "Biodiversity Metric Assessment",
@@ -727,7 +752,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "habitat_design": {
           "title": "Habitat Design",
@@ -746,7 +775,11 @@
               "phase": "proposed",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "hmmp": {
           "title": "Habitat Management & Monitoring Plan",
@@ -803,7 +836,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         },
         "unit_pricing": {
           "title": "Unit Pricing",
@@ -843,13 +880,39 @@
               "required": true
             },
             {
+              "name": "landowner_share_percent",
+              "display_name": "Landowner Share (%)",
+              "help_text": "The landowner's percentage of every sale of units. The three shares must add up to 100%.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "investor_share_percent",
+              "display_name": "Investor Share (%)",
+              "help_text": "The investor's percentage of every sale, for example to repay the cost of creating the habitats. Enter 0 if there is no investor.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "manager_share_percent",
+              "display_name": "Habitat Manager Share (%)",
+              "help_text": "The percentage for whoever manages and monitors the habitats for 30 years. Enter 0 if the landowner does this.",
+              "type": "number",
+              "required": true
+            },
+            {
               "name": "pricing_notes",
               "display_name": "Pricing Notes",
               "help_text": "Anything else about pricing, such as discounts or indexation.",
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "landowner",
+            "investor"
+          ],
+          "allow_on_behalf": true
         },
         "legal_security": {
           "title": "Legal Security",
@@ -887,8 +950,8 @@
             {
               "name": "agreement_date",
               "display_name": "Agreement Date",
-              "help_text": "When the agreement was signed. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When the agreement was signed.",
+              "type": "date",
               "required": false
             },
             {
@@ -898,7 +961,15 @@
               "type": "text",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "lpa"
+          ],
+          "allow_on_behalf": true,
+          "approval": {
+            "reject_to": "hmmp",
+            "reject_label": "Habitat Management & Monitoring Plan"
+          }
         },
         "gain_site_register": {
           "title": "Biodiversity Gain Site Register",
@@ -919,8 +990,8 @@
             {
               "name": "registration_date",
               "display_name": "Registration Date",
-              "help_text": "When the site was added to the register. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When the site was added to the register.",
+              "type": "date",
               "required": false
             },
             {
@@ -930,7 +1001,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "landowner"
+          ],
+          "allow_on_behalf": true
         }
       }
     },
@@ -968,7 +1043,11 @@
             }
           ],
           "stage": "Developer / Planning",
-          "actor": "Developer"
+          "actor": "Developer",
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "basic_info": {
           "title": "Development Name and Description",
@@ -993,7 +1072,11 @@
               "type": "textarea",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "development_details": {
           "title": "Development Details",
@@ -1047,7 +1130,11 @@
               "type": "text",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "location": {
           "title": "Development Site",
@@ -1068,7 +1155,11 @@
               "type": "location_table",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "development_baseline": {
           "title": "Development Baseline Assessment",
@@ -1087,7 +1178,12 @@
               "phase": "baseline",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "developer",
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "development_proposal": {
           "title": "Development Metric Assessment",
@@ -1106,7 +1202,11 @@
               "phase": "proposed",
               "required": true
             }
-          ]
+          ],
+          "roles": [
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "mitigation_hierarchy": {
           "title": "Mitigation Hierarchy Review",
@@ -1145,7 +1245,12 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "developer",
+            "ecologist"
+          ],
+          "allow_on_behalf": true
         },
         "onsite_decision": {
           "title": "On-Site BNG Decision",
@@ -1187,7 +1292,12 @@
               "equals": "10% net gain achieved on-site",
               "next": "planning_application"
             }
-          ]
+          ],
+          "roles": [
+            "developer",
+            "lpa"
+          ],
+          "allow_on_behalf": true
         },
         "offsite_allocation": {
           "title": "Off-Site Unit Reservation",
@@ -1205,7 +1315,11 @@
               "required": false,
               "help_text": "Request units from registered habitat banks to cover the shortfall. The habitat bank accepts or declines each request; accepted units are reserved for this development, become allocated when planning permission is granted, and are retired when the gain plan is approved."
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "planning_application": {
           "title": "Planning Application",
@@ -1226,8 +1340,8 @@
             {
               "name": "submission_date",
               "display_name": "Submission Date",
-              "help_text": "When the application was submitted. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When the application was submitted.",
+              "type": "date",
               "required": false
             },
             {
@@ -1237,7 +1351,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         },
         "planning_permission": {
           "title": "Planning Permission Granted",
@@ -1251,7 +1369,7 @@
             {
               "name": "decision",
               "display_name": "Decision",
-              "help_text": "The planning authority's decision. When permission is granted, the development's reserved off-site units become allocated.",
+              "help_text": "The planning authority's decision. When permission is granted, the development's reserved off-site units become allocated. To refuse the application, use Reject: it goes back to the developer.",
               "type": "select",
               "required": true,
               "options": [
@@ -1262,18 +1380,14 @@
                 {
                   "value": "Granted with conditions",
                   "label": "Granted with conditions"
-                },
-                {
-                  "value": "Refused",
-                  "label": "Refused"
                 }
               ]
             },
             {
               "name": "decision_date",
               "display_name": "Decision Date",
-              "help_text": "When the decision was issued. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When the decision was issued.",
+              "type": "date",
               "required": false
             },
             {
@@ -1283,7 +1397,15 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "lpa"
+          ],
+          "allow_on_behalf": true,
+          "approval": {
+            "reject_to": "planning_application",
+            "reject_label": "Planning Application"
+          }
         },
         "gain_condition": {
           "title": "Biodiversity Gain Condition",
@@ -1308,7 +1430,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "lpa"
+          ],
+          "allow_on_behalf": true
         },
         "gain_plan_approval": {
           "title": "Biodiversity Gain Plan Approval",
@@ -1329,8 +1455,8 @@
             {
               "name": "approval_date",
               "display_name": "Approval Date",
-              "help_text": "When the gain plan was approved. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When the gain plan was approved.",
+              "type": "date",
               "required": false
             },
             {
@@ -1340,7 +1466,15 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "lpa"
+          ],
+          "allow_on_behalf": true,
+          "approval": {
+            "reject_to": "onsite_decision",
+            "reject_label": "On-Site BNG Decision"
+          }
         },
         "commencement": {
           "title": "Development Commencement",
@@ -1354,8 +1488,8 @@
             {
               "name": "commencement_date",
               "display_name": "Commencement Date",
-              "help_text": "When development started on site. Use the format YYYY-MM-DD.",
-              "type": "text",
+              "help_text": "When development started on site.",
+              "type": "date",
               "required": true
             },
             {
@@ -1365,7 +1499,11 @@
               "type": "textarea",
               "required": false
             }
-          ]
+          ],
+          "roles": [
+            "developer"
+          ],
+          "allow_on_behalf": true
         }
       }
     }

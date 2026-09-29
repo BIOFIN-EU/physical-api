@@ -282,7 +282,7 @@ def test_non_bng_payload_has_no_bng_keys(case_id):
 
 # ---------- phase 2: marketplace lifecycle ----------
 
-from app.models.bng import BngTransaction  # noqa: E402
+from app.models.bng import BNG_CREATOR_ROLE, BngCaseRole, BngTransaction  # noqa: E402
 from app.models.case_data import CaseUserAccess  # noqa: E402
 from app.services.bng_marketplace import apply_allocation_action  # noqa: E402
 from app.services.bng_payload import bank_finances  # noqa: E402
@@ -291,19 +291,26 @@ from fastapi import HTTPException  # noqa: E402
 
 
 def _owner(case_id: int) -> uuid.UUID:
+    """The project's owner, with its creator role, as when a user creates it."""
     user = uuid.uuid4()
     with SessionLocal() as session:
         session.add(CaseUserAccess(
             case_id=case_id, user_id=user, case_role="borrower", is_owner=True,
             can_view=True, can_update=True, can_delete=True, can_assign_users=True,
         ))
+        role = BNG_CREATOR_ROLE.get(session.get(Case, case_id).case_type)
+        if role:
+            session.add(BngCaseRole(case_id=case_id, user_id=user, role=role))
         session.commit()
     return user
 
 
 def _priced_bank(cases, ref, price="100") -> int:
     bank = _bank_with_uplift(cases, ref)
-    BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {"price_per_habitat_unit": price, "delivery_cost": "3000"})
+    BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {
+        "price_per_habitat_unit": price, "delivery_cost": "3000",
+        "landowner_share_percent": 70, "investor_share_percent": 20, "manager_share_percent": 10,
+    })
     return bank
 
 
@@ -469,3 +476,259 @@ def test_next_if_branching():
     # Steps without next_if behave exactly as before.
     assert wf._resolve_next_step({"next": "b"}, {"choice": "skip"}) == "b"
     assert wf._resolve_next_step({"next": None}, {}) is None
+
+
+# ---------- phase 3: roles, approvals, revenue split, monitoring ----------
+
+from datetime import date  # noqa: E402
+
+from app.models.bng import BngMonitoringReport  # noqa: E402
+from app.schemas.bng_requests import (  # noqa: E402
+    MonitoringReportSubmit,
+    MonitoringReportVerify,
+    RemedialActionComplete,
+)
+from app.services import bng_monitoring  # noqa: E402
+from app.services.bng_roles import act_as, authorize_step, set_user_roles, user_roles  # noqa: E402
+
+
+def _member(case_id: int, *roles: str, manager: bool = False) -> uuid.UUID:
+    """A project member with these BNG roles (a manager can assign users)."""
+    user = uuid.uuid4()
+    with SessionLocal() as session:
+        session.add(CaseUserAccess(
+            case_id=case_id, user_id=user, case_role="intermediary",
+            can_view=True, can_update=True, can_delete=False, can_assign_users=manager,
+        ))
+        for role in roles:
+            session.add(BngCaseRole(case_id=case_id, user_id=user, role=role))
+        session.commit()
+    return user
+
+
+def _access(case_id: int, user: uuid.UUID) -> CaseUserAccess:
+    with SessionLocal() as session:
+        return session.execute(
+            select(CaseUserAccess).where(CaseUserAccess.case_id == case_id, CaseUserAccess.user_id == user)
+        ).scalar_one()
+
+
+LPA_STEP = {"roles": ["lpa"], "allow_on_behalf": True, "approval": {"reject_to": "planning_application"}}
+
+
+def _authorize(case_id, user, step, payload):
+    return _run(lambda db: authorize_step(db, access=_access(case_id, user), step_config=step, payload=payload))
+
+
+def test_steps_without_roles_are_untouched(cases):
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    payload = {"name": "x", "_decision": "rejected", "_bng_on_behalf": True}
+    assert _authorize(development, _member(development), {"fields": []}, payload) is None
+    assert payload == {"name": "x", "_decision": "rejected", "_bng_on_behalf": True}
+
+
+def test_step_roles_and_recording_on_behalf(cases):
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    lpa = _member(development, "lpa")
+    developer = _member(development, "developer")
+    manager = _member(development, "developer", manager=True)
+
+    assert _authorize(development, lpa, LPA_STEP, {"decision": "Granted"}) == {
+        "role": "lpa", "on_behalf": False, "decision": "approved",
+    }
+    with pytest.raises(HTTPException) as exc:
+        _authorize(development, developer, LPA_STEP, {"decision": "Granted"})
+    assert exc.value.status_code == 403 and exc.value.detail["code"] == "bng_role_required"
+
+    # A manager must confirm they record it on the LPA's behalf.
+    with pytest.raises(HTTPException) as exc:
+        _authorize(development, manager, LPA_STEP, {"decision": "Granted"})
+    assert exc.value.detail["code"] == "bng_on_behalf_confirmation_required"
+    payload = {"decision": "Granted", "_bng_on_behalf": True}
+    assert _authorize(development, manager, LPA_STEP, payload)["on_behalf"] is True
+    assert payload == {"decision": "Granted"}  # frontend keys removed
+
+    # Without allow_on_behalf only the role itself can.
+    with pytest.raises(HTTPException) as exc:
+        _authorize(development, manager, {"roles": ["lpa"]}, {"_bng_on_behalf": True})
+    assert exc.value.detail["code"] == "bng_role_required"
+
+
+def test_rejection_needs_a_reason(cases):
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    lpa = _member(development, "lpa")
+    with pytest.raises(HTTPException) as exc:
+        _authorize(development, lpa, LPA_STEP, {"_decision": "rejected"})
+    assert exc.value.status_code == 422
+
+    payload = {"_decision": "rejected", "_rejection_comment": " Metric incomplete "}
+    capacity = _authorize(development, lpa, LPA_STEP, payload)
+    assert capacity["decision"] == "rejected" and capacity["comment"] == "Metric incomplete"
+    assert payload == {"_decision": "rejected"}  # the workflow engine reads it
+
+
+def test_engine_rejection_goes_back():
+    wf = ConfigDrivenCaseWorkflow()
+    wf.workflow_config = {"steps": {"planning_application": {}, "planning_permission": {}}}
+    step = {"approval": {"reject_to": "planning_application"}}
+    assert wf._is_rejection(step, {"_decision": "rejected"})
+    assert wf._rejection_target(step) == "planning_application"
+    # Steps that aren't approvals are never rejections, whatever is sent.
+    assert not wf._is_rejection({"next": "x"}, {"_decision": "rejected"})
+    assert not wf._is_rejection(step, {"_decision": "approved"})
+
+
+def test_a_user_can_hold_several_roles(cases):
+    bank = cases(BNG_HABITAT_BANK_WORKFLOW)
+    owner = _owner(bank)
+    member = _member(bank)
+    with SessionLocal() as session:  # added with view access only
+        session.execute(text(f"UPDATE case_data.case_user_access SET can_update = false WHERE user_id = '{member}'"))
+        session.commit()
+    assert _run(lambda db: set_user_roles(
+        db, case_id=bank, user_id=member, roles=["landowner", "investor"], actor_user_id=owner
+    )) == ["landowner", "investor"]
+    assert _run(lambda db: user_roles(db, bank, member)) == {"landowner", "investor"}
+    assert _access(bank, member).can_update  # a role lets them submit its steps
+    _run(lambda db: set_user_roles(db, case_id=bank, user_id=member, roles=["investor"], actor_user_id=owner))
+    assert _run(lambda db: user_roles(db, bank, member)) == {"investor"}
+
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: set_user_roles(db, case_id=bank, user_id=member, roles=["mayor"], actor_user_id=owner))
+    assert exc.value.status_code == 422
+    with pytest.raises(HTTPException) as exc:  # not a project member
+        _run(lambda db: set_user_roles(db, case_id=bank, user_id=uuid.uuid4(), roles=["lpa"], actor_user_id=owner))
+    assert exc.value.status_code == 404
+
+
+def test_marketplace_decisions_need_the_role(cases, reference):
+    bank = _priced_bank(cases, reference)
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "5"}],
+    })
+    allocation_id = _allocation(development, bank).id
+
+    ecologist = _member(bank, "ecologist")
+    with pytest.raises(HTTPException) as exc:
+        _action(allocation_id, "accept", ecologist)
+    assert exc.value.status_code == 403
+
+    manager = _member(bank, manager=True)
+    with pytest.raises(HTTPException) as exc:
+        _action(allocation_id, "accept", manager)
+    assert exc.value.detail["code"] == "bng_on_behalf_confirmation_required"
+    assert _run(lambda db: apply_allocation_action(
+        db, allocation_id=allocation_id, action="accept", user_id=manager, on_behalf=True
+    )).status == "reserved"
+
+
+def test_revenue_shares_must_add_up(cases):
+    bank = cases(BNG_HABITAT_BANK_WORKFLOW)
+    with pytest.raises(ApplicationError) as exc:
+        BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {
+            "price_per_habitat_unit": 10, "delivery_cost": 1,
+            "landowner_share_percent": 70, "investor_share_percent": 20, "manager_share_percent": 5,
+        })
+    assert "add up to 95%" in str(exc.value.details)
+
+
+def test_transactions_keep_the_revenue_split(cases, reference):
+    bank = _priced_bank(cases, reference)   # 70 / 20 / 10
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    _action(_allocation(development, bank).id, "accept", _owner(bank))
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Granted"})
+    BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-1"})
+
+    # A later change of split doesn't change the recorded sale.
+    BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {
+        "price_per_habitat_unit": 100, "delivery_cost": 3000,
+        "landowner_share_percent": 100, "investor_share_percent": 0, "manager_share_percent": 0,
+    })
+    finances = _run(lambda db: bank_finances(db, session_get_case(bank)))
+    assert finances["revenue_shares"] == {"landowner": 100.0, "investor": 0.0, "manager": 0.0}
+    assert finances["revenue_distribution"] == {
+        "retired_revenue": 4400.0,
+        "distributed": {"landowner": 3080.0, "investor": 880.0, "manager": 440.0},
+        "not_split": 0.0,
+    }
+
+
+def _registered_bank(cases, registration_date="2026-03-01") -> int:
+    bank = cases(BNG_HABITAT_BANK_WORKFLOW, status="completed")
+    BNG_ACTIVITIES["save_bng_gain_site_register_step"](bank, {
+        "register_reference": "BGS-1", "registration_date": registration_date,
+    })
+    return bank
+
+
+def test_monitoring_schedule(cases):
+    bank = _registered_bank(cases, "2024-02-29")
+    reports = _run(lambda db: bng_monitoring.bank_reports(db, session_get_case(bank)))
+    assert [r["year"] for r in reports] == [1, 2, 5, 10, 15, 20, 25, 30]
+    assert reports[0]["due_date"] == "2025-02-28" and reports[1]["due_date"] == "2026-02-28"
+    assert all(r["status"] == "due" for r in reports)
+    # Reading it again doesn't create a second schedule.
+    assert len(_run(lambda db: bng_monitoring.bank_reports(db, session_get_case(bank)))) == 8
+
+    # A bank that isn't registered yet has no schedule.
+    unregistered = cases(BNG_HABITAT_BANK_WORKFLOW)
+    assert _run(lambda db: bng_monitoring.bank_reports(db, session_get_case(unregistered))) == []
+
+
+def test_monitoring_verification_and_remedial_actions(cases):
+    bank = _registered_bank(cases)
+    landowner = _owner(bank)
+    ecologist = _member(bank, "ecologist")
+    report_id = _run(lambda db: bng_monitoring.bank_reports(db, session_get_case(bank)))[0]["id"]
+
+    submit = MonitoringReportSubmit(habitats_on_track=False, condition_summary="Scrub encroaching")
+    # Only the landowner submits; only an ecologist or the LPA verifies.
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: bng_monitoring.submit_report(db, report_id=report_id, user_id=ecologist, body=submit))
+    assert exc.value.status_code == 403
+    _run(lambda db: bng_monitoring.submit_report(db, report_id=report_id, user_id=landowner, body=submit))
+
+    fail_without_action = MonitoringReportVerify(outcome="failed")
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: bng_monitoring.verify_report(db, report_id=report_id, user_id=ecologist, body=fail_without_action))
+    assert exc.value.status_code == 422
+
+    verify = MonitoringReportVerify(
+        outcome="failed", verification_notes="Grassland below target",
+        remedial_actions=[{"description": "Clear scrub", "due_date": date(2027, 9, 1)},
+                          {"description": "Reseed"}],
+    )
+    with pytest.raises(HTTPException) as exc:  # the landowner can't verify their own report
+        _run(lambda db: bng_monitoring.verify_report(db, report_id=report_id, user_id=_member(bank, "landowner"), body=verify))
+    assert exc.value.status_code == 403
+    _run(lambda db: bng_monitoring.verify_report(db, report_id=report_id, user_id=ecologist, body=verify))
+
+    report = _run(lambda db: bng_monitoring.bank_reports(db, session_get_case(bank)))[0]
+    assert report["status"] == "failed" and report["verified_as"] == "ecologist"
+    assert [a["status"] for a in report["remedial_actions"]] == ["open", "open"]
+
+    done = RemedialActionComplete(completion_notes="Done")
+    for action in report["remedial_actions"]:
+        _run(lambda db, a=action: bng_monitoring.complete_remedial_action(db, action_id=a["id"], user_id=landowner, body=done))
+    with SessionLocal() as session:
+        assert session.get(BngMonitoringReport, report_id).status == "remediated"
+
+    # A verified report can't be re-submitted.
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: bng_monitoring.submit_report(db, report_id=report_id, user_id=landowner, body=submit))
+    assert exc.value.status_code == 409
+
+
+def test_date_fields_must_be_iso_dates(cases):
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    for bad in ("15/01/2027", "2027-02-30", "soon"):
+        with pytest.raises(ApplicationError) as exc:
+            BNG_ACTIVITIES["save_bng_commencement_step"](development, {"commencement_date": bad})
+        assert "commencement_date" in str(exc.value.details)
+    BNG_ACTIVITIES["save_bng_commencement_step"](development, {"commencement_date": "2027-01-15"})
+    BNG_ACTIVITIES["save_bng_planning_application_step"](development, {"application_reference": "A", "submission_date": None})
+

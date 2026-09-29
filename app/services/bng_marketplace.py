@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bng import BngUnitAllocation
 from app.models.case_data import Case
+from app.services.bng_roles import act_as
 from app.services.case_user_access_service import get_case_user_access
 
 # action -> (whose project decides, statuses it applies to, new status)
@@ -21,6 +22,11 @@ ACTIONS = {
     "accept": ("habitat_bank", ("requested",), "reserved"),
     "decline": ("habitat_bank", ("requested",), "declined"),
     "release": ("development", ("requested", "reserved"), "released"),
+}
+# BNG roles that decide, per side (a project manager can act on their behalf).
+DECIDING_ROLES = {
+    "habitat_bank": ("landowner", "investor"),
+    "development": ("developer",),
 }
 
 
@@ -30,6 +36,7 @@ async def apply_allocation_action(
     allocation_id: int,
     action: str,
     user_id: UUID,
+    on_behalf: bool = False,
 ) -> BngUnitAllocation:
     side, from_statuses, to_status = ACTIONS[action]
 
@@ -42,6 +49,14 @@ async def apply_allocation_action(
     if access is None or not access.can_update:
         # Don't reveal allocations of projects the user can't manage.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Allocation not found")
+
+    await act_as(
+        db,
+        access=access,
+        roles=DECIDING_ROLES[side],
+        on_behalf_requested=on_behalf,
+        action=f"{action} this request",
+    )
 
     # Same lock as the capacity trigger, then re-read the row under it.
     await db.execute(select(Case.id).where(Case.id == allocation.habitat_bank_case_id).with_for_update())

@@ -88,3 +88,70 @@ def bank_financials(
         "pipeline_revenue": _float(pipeline),
         "potential_margin": _float(potential - delivery_cost) if potential is not None and delivery_cost is not None else None,
     }
+
+
+# ---------------------------------------------------------
+# Revenue split (Phase 3, diagram step 31)
+# ---------------------------------------------------------
+
+# unit_pricing step fields: each party's percentage of every sale.
+SHARE_FIELDS = {
+    "landowner": "landowner_share_percent",
+    "investor": "investor_share_percent",
+    "manager": "manager_share_percent",
+}
+
+
+def shares_from_step(data: Mapping[str, Any] | None) -> dict[str, Decimal] | None:
+    """The bank's revenue split, or None when it hasn't been set."""
+    data = data or {}
+    shares = {party: _money(data.get(field)) for party, field in SHARE_FIELDS.items()}
+    if any(share is None for share in shares.values()):
+        return None
+    return shares
+
+
+def shares_error(data: Mapping[str, Any] | None) -> str | None:
+    """Why the submitted split is invalid, or None."""
+    data = data or {}
+    values = [data.get(field) for field in SHARE_FIELDS.values()]
+    if all(value in (None, "") for value in values):
+        return None
+    shares = shares_from_step(data)
+    if shares is None or any(share > 100 for share in shares.values()):
+        return "Enter a percentage from 0 to 100 for each party."
+    if sum(shares.values()) != Decimal(100):
+        return f"The shares add up to {sum(shares.values()):g}%; they must add up to 100%."
+    return None
+
+
+def split(total: Decimal | None, shares: Mapping[str, Decimal] | None) -> dict[str, float] | None:
+    if total is None or shares is None:
+        return None
+    return {party: _float(total * share / 100) for party, share in shares.items()}
+
+
+def revenue_distribution(
+    transactions: list[tuple[Decimal | None, Mapping[str, Decimal] | None]],
+) -> dict[str, Any]:
+    """
+    (total_price, shares at the time of sale) per transaction: what each
+    party has earned from retired units.
+    """
+    earned = {party: Decimal(0) for party in SHARE_FIELDS}
+    revenue = Decimal(0)
+    unsplit = Decimal(0)
+    for total, shares in transactions:
+        if total is None:
+            continue
+        revenue += total
+        if shares is None:
+            unsplit += total
+            continue
+        for party, share in shares.items():
+            earned[party] += total * share / 100
+    return {
+        "retired_revenue": _float(revenue),
+        "distributed": {party: _float(amount) for party, amount in earned.items()},
+        "not_split": _float(unsplit),
+    }
