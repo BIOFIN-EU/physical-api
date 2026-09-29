@@ -7,6 +7,7 @@ errors and created_by / updated_by work exactly as for other steps.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -14,19 +15,24 @@ from sqlalchemy.exc import DBAPIError
 from temporalio import activity
 
 from app.models.bng import (
+    ACTIVE_ALLOCATION_STATUSES,
     BNG_ALLOCATION_STEP,
     BNG_CATEGORIES,
     BNG_HABITAT_BANK_WORKFLOW,
+    BNG_PRICING_STEP,
+    LOCKED_ALLOCATION_STATUSES,
     BngCondition,
     BngHabitatParcel,
     BngHabitatType,
     BngStepData,
     BngStrategicSignificance,
+    BngTransaction,
     BngUnitAllocation,
 )
 from app.models.case_data import Case
 from app.schemas.bng import HabitatParcelsStepInput, UnitAllocationStepInput
-from app.services.bng_metric import parcel_units
+from app.services.bng_finance import prices_from_step, total_price
+from app.services.bng_metric import ParcelUnits, parcel_units, summarise
 from app.workflows.activities import (
     SessionLocal,
     _begin_user_write,
@@ -44,6 +50,7 @@ BNG_FORM_STEPS = (
     "feasibility",
     "baseline_metric",
     "hmmp",
+    "unit_pricing",
     "legal_security",
     "gain_site_register",
     # Development
@@ -51,11 +58,11 @@ BNG_FORM_STEPS = (
     "mitigation_hierarchy",
     "onsite_decision",
     "planning_application",
-    "planning_permission",
     "gain_condition",
-    "gain_plan_approval",
     "commencement",
 )
+# planning_permission and gain_plan_approval are form steps too, but also move
+# the development's units along their lifecycle (see below).
 
 _UNIT_COLUMN = {
     "area": "habitat_units",
@@ -78,19 +85,30 @@ def _save_step_data(session, case_id: int, step_code: str, data: dict) -> None:
         row.data = data
 
 
-def _make_form_step_activity(step_code: str):
+def _answers(data: dict) -> dict:
+    # Keys starting with "_" are transport metadata, not answers. "_saved"
+    # marks the step as submitted even when it has no answers.
+    answers = {key: value for key, value in data.items() if not key.startswith("_")}
+    answers["_saved"] = True
+    return answers
+
+
+def _make_form_step_activity(step_code: str, after_save=None):
+    """
+    A form step storing its answers. `after_save(session, case_id, answers)`
+    runs in the same transaction, for steps that also change other records.
+    """
     @activity.defn(name=f"save_bng_{step_code}_step")
     def save_form_step(case_id: int, data: dict) -> None:
         actor = _pop_actor(data)
-        # Keys starting with "_" are transport metadata, not answers.
-        answers = {key: value for key, value in data.items() if not key.startswith("_")}
-        # Marks the step as submitted even when it has no answers.
-        answers["_saved"] = True
+        answers = _answers(data)
         _log_activity_payload(f"save_bng_{step_code}_step", case_id, answers)
 
         with SessionLocal() as session:
             _begin_user_write(session, case_id, actor)
             _save_step_data(session, case_id, step_code, answers)
+            if after_save is not None:
+                after_save(session, case_id, answers)
             _commit_or_raise(session)
 
     save_form_step.__name__ = f"save_bng_{step_code}_step"
@@ -116,7 +134,10 @@ def _bank_totals(session, case_id: int) -> tuple[dict, dict]:
 
     allocated = {category: Decimal(0) for category in BNG_CATEGORIES}
     for allocation in session.execute(
-        select(BngUnitAllocation).where(BngUnitAllocation.habitat_bank_case_id == case_id)
+        select(BngUnitAllocation).where(
+            BngUnitAllocation.habitat_bank_case_id == case_id,
+            BngUnitAllocation.status.in_(ACTIVE_ALLOCATION_STATUSES),
+        )
     ).scalars():
         for category, column in _UNIT_COLUMN.items():
             allocated[category] += getattr(allocation, column)
@@ -214,12 +235,30 @@ def _make_habitat_parcels_activity(phase: str):
     return save_habitat_parcels
 
 
+def _units(row) -> dict[str, Decimal]:
+    return {category: getattr(row, column) for category, column in _UNIT_COLUMN.items()}
+
+
+def _bank_prices(session, bank_id: int) -> dict[str, Decimal | None]:
+    data = session.execute(
+        select(BngStepData.data).where(
+            BngStepData.case_id == bank_id,
+            BngStepData.step_code == BNG_PRICING_STEP,
+        )
+    ).scalar_one_or_none()
+    return prices_from_step(data)
+
+
 @activity.defn(name="save_bng_offsite_allocation_step")
 def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
     """
-    Replace the off-site units this development takes from habitat banks.
-    The bng_unit_allocations_capacity trigger rejects taking more than a
-    bank has; that error is shown to the user as a validation error.
+    Request off-site units from habitat banks (diagram steps 10-11). Each
+    submitted bank is matched to this development's existing allocation
+    row: an unchanged request keeps its status (a reservation the bank has
+    already accepted stays reserved), a changed or re-added one becomes a new
+    request at the bank's current prices, and banks no longer listed are
+    released. Allocated or retired units can't be changed here. The
+    bng_unit_allocations_capacity trigger rejects taking more than a bank has.
     """
     actor = _pop_actor(data)
     payload = _parse_pydantic(UnitAllocationStepInput, data)
@@ -232,8 +271,17 @@ def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
             {"allocations": "Each habitat bank can only be listed once."},
         )
 
+    now = datetime.now(timezone.utc)
+
     with SessionLocal() as session:
         _begin_user_write(session, case_id, actor)
+
+        existing = {
+            row.habitat_bank_case_id: row
+            for row in session.execute(
+                select(BngUnitAllocation).where(BngUnitAllocation.development_case_id == case_id)
+            ).scalars()
+        }
 
         for allocation in payload.allocations:
             bank = session.get(Case, allocation.habitat_bank_case_id)
@@ -249,27 +297,61 @@ def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
                     {"allocations": f"Habitat bank #{allocation.habitat_bank_case_id} is not available."},
                 )
 
-            if allocation.habitat_units + allocation.hedgerow_units + allocation.watercourse_units <= 0:
+            requested = {
+                "area": allocation.habitat_units,
+                "hedgerow": allocation.hedgerow_units,
+                "watercourse": allocation.watercourse_units,
+            }
+            if sum(requested.values()) <= 0:
                 _raise_validation_error(
                     "Please correct the highlighted fields.",
                     {"allocations": f"Enter some units to take from habitat bank #{bank.id}, or remove it."},
                 )
 
-        session.execute(
-            BngUnitAllocation.__table__.delete().where(
-                BngUnitAllocation.development_case_id == case_id
-            )
-        )
-        session.add_all(
-            BngUnitAllocation(
-                development_case_id=case_id,
-                habitat_bank_case_id=allocation.habitat_bank_case_id,
-                habitat_units=allocation.habitat_units,
-                hedgerow_units=allocation.hedgerow_units,
-                watercourse_units=allocation.watercourse_units,
-            )
-            for allocation in payload.allocations
-        )
+            row = existing.get(bank.id)
+
+            if row is not None and row.status in LOCKED_ALLOCATION_STATUSES:
+                if _units(row) != requested:
+                    _raise_validation_error(
+                        "Please correct the highlighted fields.",
+                        {"allocations": f"Units from habitat bank #{bank.id} are already {row.status} and can't be changed."},
+                    )
+                continue
+
+            if row is not None and row.status in ("requested", "reserved") and _units(row) == requested:
+                continue  # unchanged request or accepted reservation
+
+            prices = _bank_prices(session, bank.id)
+            values = {
+                "habitat_units": requested["area"],
+                "hedgerow_units": requested["hedgerow"],
+                "watercourse_units": requested["watercourse"],
+                "status": "requested",
+                "price_per_habitat_unit": prices["area"],
+                "price_per_hedgerow_unit": prices["hedgerow"],
+                "price_per_watercourse_unit": prices["watercourse"],
+                "total_price": total_price(requested, prices),
+                "decided_at": None,
+                "released_at": None,
+            }
+            if row is None:
+                session.add(BngUnitAllocation(development_case_id=case_id, habitat_bank_case_id=bank.id, **values))
+            else:
+                for field, value in values.items():
+                    setattr(row, field, value)
+
+        submitted = set(bank_ids)
+        for bank_id, row in existing.items():
+            if bank_id in submitted or row.status in ("declined", "released"):
+                continue
+            if row.status in LOCKED_ALLOCATION_STATUSES:
+                _raise_validation_error(
+                    "Please correct the highlighted fields.",
+                    {"allocations": f"Units from habitat bank #{bank_id} are already {row.status} and can't be removed."},
+                )
+            row.status = "released"
+            row.released_at = now
+
         _save_step_data(session, case_id, BNG_ALLOCATION_STEP, {"_saved": True})
 
         try:
@@ -288,6 +370,90 @@ def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
         _commit_or_raise(session)
 
 
+PERMISSION_GRANTED = ("Granted", "Granted with conditions")
+
+
+def _allocate_on_permission(session, case_id: int, answers: dict) -> None:
+    """Planning permission granted: reserved units become allocated (step 14)."""
+    if answers.get("decision") not in PERMISSION_GRANTED:
+        return
+    now = datetime.now(timezone.utc)
+    for row in session.execute(
+        select(BngUnitAllocation).where(
+            BngUnitAllocation.development_case_id == case_id,
+            BngUnitAllocation.status == "reserved",
+        )
+    ).scalars():
+        row.status = "allocated"
+        row.allocated_at = now
+
+
+def _development_shortfall(session, case_id: int) -> dict[str, Decimal]:
+    """Units still needed per category, counting only allocated/retired units."""
+    parcels = [
+        ParcelUnits(parcel.phase, parcel.category, parcel.units)
+        for parcel in session.execute(
+            select(BngHabitatParcel).where(BngHabitatParcel.case_id == case_id)
+        ).scalars()
+    ]
+    secured = {category: Decimal(0) for category in BNG_CATEGORIES}
+    for row in session.execute(
+        select(BngUnitAllocation).where(
+            BngUnitAllocation.development_case_id == case_id,
+            BngUnitAllocation.status.in_(LOCKED_ALLOCATION_STATUSES),
+        )
+    ).scalars():
+        for category, amount in _units(row).items():
+            secured[category] += amount
+
+    summary = summarise(parcels, role="development", allocated=secured)
+    return {entry["category"]: Decimal(str(entry["remaining_shortfall_units"])) for entry in summary["categories"]}
+
+
+def _retire_on_gain_plan_approval(session, case_id: int, answers: dict) -> None:
+    """
+    Gain plan approved: the units must cover the target, then they are
+    retired and locked (step 16) with a permanent transaction record whose
+    reference goes on the gain plan (step 17).
+    """
+    shortfall = _development_shortfall(session, case_id)
+    missing = [f"{amount:.2f} {category}" for category, amount in shortfall.items() if amount > 0]
+    if missing:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {
+                "gain_plan_reference": (
+                    "The gain plan can't be approved yet: the 10% target still needs "
+                    + ", ".join(missing)
+                    + " units. Off-site units count once they are allocated (planning permission granted)."
+                )
+            },
+        )
+
+    now = datetime.now(timezone.utc)
+    rows = session.execute(
+        select(BngUnitAllocation).where(
+            BngUnitAllocation.development_case_id == case_id,
+            BngUnitAllocation.status == "allocated",
+        )
+    ).scalars().all()
+    for row in rows:
+        row.status = "retired"
+        row.retired_at = now
+        session.add(
+            BngTransaction(
+                reference=f"BNG-{now.year}-{row.id:06d}",
+                allocation_id=row.id,
+                development_case_id=row.development_case_id,
+                habitat_bank_case_id=row.habitat_bank_case_id,
+                habitat_units=row.habitat_units,
+                hedgerow_units=row.hedgerow_units,
+                watercourse_units=row.watercourse_units,
+                total_price=row.total_price,
+            )
+        )
+
+
 BNG_ACTIVITIES = {
     **{
         f"save_bng_{step_code}_step": _make_form_step_activity(step_code)
@@ -296,4 +462,10 @@ BNG_ACTIVITIES = {
     "save_bng_baseline_habitats_step": _make_habitat_parcels_activity("baseline"),
     "save_bng_proposed_habitats_step": _make_habitat_parcels_activity("proposed"),
     "save_bng_offsite_allocation_step": save_bng_offsite_allocation_step,
+    "save_bng_planning_permission_step": _make_form_step_activity(
+        "planning_permission", after_save=_allocate_on_permission
+    ),
+    "save_bng_gain_plan_approval_step": _make_form_step_activity(
+        "gain_plan_approval", after_save=_retire_on_gain_plan_approval
+    ),
 }

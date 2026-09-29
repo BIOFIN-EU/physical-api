@@ -266,7 +266,9 @@ def test_bng_payload_and_bank_listing(cases, reference):
     assert dev_payload["development_baseline"][0]["units"] == 20.0
     assert dev_payload["offsite_allocation"]["allocations"][0]["habitat_units"] == 20.0
     dev_area = next(c for c in dev_payload["bng_metric"]["categories"] if c["category"] == "area")
-    assert dev_area["allocated_units"] == 20.0
+    # Requested, not yet accepted by the bank: pending, not secured.
+    assert dev_area["pending_units"] == 20.0
+    assert dev_area["allocated_units"] == 0.0
 
     assert bank_payload["bng_allocated_to"][0]["development_case_id"] == development
     listed = next(b for b in banks if b["case_id"] == bank)
@@ -276,3 +278,194 @@ def test_bng_payload_and_bank_listing(cases, reference):
 def test_non_bng_payload_has_no_bng_keys(case_id):
     payload = _run(lambda db: build_case_payload(db, case_id))
     assert not [key for key in payload if key.startswith("bng_")]
+
+
+# ---------- phase 2: marketplace lifecycle ----------
+
+from app.models.bng import BngTransaction  # noqa: E402
+from app.models.case_data import CaseUserAccess  # noqa: E402
+from app.services.bng_marketplace import apply_allocation_action  # noqa: E402
+from app.services.bng_payload import bank_finances  # noqa: E402
+from app.workflows.case_workflow import ConfigDrivenCaseWorkflow  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
+
+def _owner(case_id: int) -> uuid.UUID:
+    user = uuid.uuid4()
+    with SessionLocal() as session:
+        session.add(CaseUserAccess(
+            case_id=case_id, user_id=user, case_role="borrower", is_owner=True,
+            can_view=True, can_update=True, can_delete=True, can_assign_users=True,
+        ))
+        session.commit()
+    return user
+
+
+def _priced_bank(cases, ref, price="100") -> int:
+    bank = _bank_with_uplift(cases, ref)
+    BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {"price_per_habitat_unit": price, "delivery_cost": "3000"})
+    return bank
+
+
+def _allocation(development: int, bank: int) -> BngUnitAllocation:
+    with SessionLocal() as session:
+        return session.execute(
+            select(BngUnitAllocation).where(
+                BngUnitAllocation.development_case_id == development,
+                BngUnitAllocation.habitat_bank_case_id == bank,
+            )
+        ).scalar_one()
+
+
+def _action(allocation_id: int, action: str, user: uuid.UUID) -> str:
+    return _run(lambda db: apply_allocation_action(db, allocation_id=allocation_id, action=action, user_id=user)).status
+
+
+def _development_needing(cases, ref, needed_area_units: int) -> int:
+    """A development whose area target needs `needed_area_units` off-site (nothing on-site afterwards)."""
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    # baseline: size x 4 x 1 x 1; target = baseline x 1.1; proposed is 0.
+    size = Decimal(needed_area_units) / Decimal("4.4")
+    BNG_ACTIVITIES["save_bng_baseline_habitats_step"](development, {"parcels": [_parcel(ref, "area", str(size))]})
+    return development
+
+
+def test_request_prices_are_snapshotted(cases, reference):
+    bank = _priced_bank(cases, reference, price="120")
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "10"}],
+    })
+    row = _allocation(development, bank)
+    assert row.status == "requested"
+    assert float(row.price_per_habitat_unit) == 120.0
+    assert float(row.total_price) == 1200.0
+
+
+def test_full_lifecycle_to_transaction_record(cases, reference):
+    bank = _priced_bank(cases, reference)
+    bank_owner = _owner(bank)
+    development = _development_needing(cases, reference, 44)
+
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    allocation_id = _allocation(development, bank).id
+
+    assert _action(allocation_id, "accept", bank_owner) == "reserved"
+
+    # Resubmitting the same amount keeps the accepted reservation.
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    assert _allocation(development, bank).status == "reserved"
+
+    # Refused permission leaves it reserved; granted allocates it.
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Refused"})
+    assert _allocation(development, bank).status == "reserved"
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Granted"})
+    assert _allocation(development, bank).status == "allocated"
+
+    BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-1"})
+    row = _allocation(development, bank)
+    assert row.status == "retired"
+
+    with SessionLocal() as session:
+        transaction = session.execute(
+            select(BngTransaction).where(BngTransaction.allocation_id == row.id)
+        ).scalar_one()
+        assert transaction.reference.startswith("BNG-") and transaction.reference.endswith(f"{row.id:06d}")
+        assert float(transaction.habitat_units) == 44.0
+        assert float(transaction.total_price) == 4400.0
+
+    finances = _run(lambda db: bank_finances(db, session_get_case(bank)))
+    assert finances["committed_revenue"] == 4400.0
+    assert finances["potential_revenue"] == 8000.0  # 80 uplift x 100
+    assert finances["potential_margin"] == 5000.0   # 8000 - 3000
+
+    # Retired units can't be changed or released any more.
+    with pytest.raises(ApplicationError):
+        BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {"allocations": []})
+    with pytest.raises(HTTPException) as exc:
+        _action(row.id, "release", _owner(development))
+    assert exc.value.status_code == 409
+
+
+def session_get_case(case_id: int) -> Case:
+    with SessionLocal() as session:
+        return session.get(Case, case_id)
+
+
+def test_gain_plan_needs_the_target_covered(cases, reference):
+    bank = _priced_bank(cases, reference)
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    # Still only requested (not accepted, not allocated).
+    with pytest.raises(ApplicationError) as exc:
+        BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-1"})
+    assert "can't be approved yet" in str(exc.value.details)
+
+
+def test_decline_and_release_free_units(cases, reference):
+    bank = _priced_bank(cases, reference)   # 80 units of uplift
+    bank_owner = _owner(bank)
+    first, second = cases(BNG_DEVELOPMENT_WORKFLOW), cases(BNG_DEVELOPMENT_WORKFLOW)
+
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](first, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "70"}],
+    })
+    # Declined: the 70 units are free again for another development.
+    assert _action(_allocation(first, bank).id, "decline", bank_owner) == "declined"
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](second, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "70"}],
+    })
+
+    # Released by the developer: free again too.
+    assert _action(_allocation(second, bank).id, "release", _owner(second)) == "released"
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](first, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "75"}],
+    })
+    assert _allocation(first, bank).status == "requested"
+
+
+def test_only_the_bank_can_accept(cases, reference):
+    bank = _priced_bank(cases, reference)
+    development = cases(BNG_DEVELOPMENT_WORKFLOW)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "5"}],
+    })
+    with pytest.raises(HTTPException) as exc:
+        _action(_allocation(development, bank).id, "accept", _owner(development))
+    assert exc.value.status_code == 404
+
+
+def test_transaction_records_cannot_be_changed(cases, reference):
+    bank = _priced_bank(cases, reference)
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    _action(_allocation(development, bank).id, "accept", _owner(bank))
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Granted"})
+    BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-1"})
+
+    with SessionLocal() as session:
+        with pytest.raises(DBAPIError) as exc:
+            session.execute(text(
+                f"UPDATE case_data.bng_transactions SET total_price = 0 WHERE development_case_id = {development}"
+            ))
+        assert "bng_transaction_immutable" in str(exc.value)
+
+
+def test_next_if_branching():
+    wf = ConfigDrivenCaseWorkflow()
+    wf.workflow_config = {"steps": {"a": {}, "b": {}, "c": {}}}
+    step = {"next": "b", "next_if": [{"field": "choice", "equals": "skip", "next": "c"}]}
+
+    assert wf._resolve_next_step(step, {"choice": "skip"}) == "c"
+    assert wf._resolve_next_step(step, {"choice": "other"}) == "b"
+    # Steps without next_if behave exactly as before.
+    assert wf._resolve_next_step({"next": "b"}, {"choice": "skip"}) == "b"
+    assert wf._resolve_next_step({"next": None}, {}) is None

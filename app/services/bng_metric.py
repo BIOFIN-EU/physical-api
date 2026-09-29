@@ -48,17 +48,21 @@ def summarise(
     *,
     role: str,
     allocated: dict[str, Decimal] | None = None,
+    pending: dict[str, Decimal] | None = None,
 ) -> dict:
     """
     Per-category totals for a case.
 
     role "habitat_bank": the uplift (proposed - baseline) is what the bank can
-    sell; `allocated` is what developments have already taken.
+    sell; `allocated` is everything developments hold (requested, reserved,
+    allocated or retired), of which `pending` still awaits the bank's decision.
 
     role "development": the target is baseline x 1.10; any on-site shortfall
-    must be met with off-site units, of which `allocated` are secured.
+    must be met with off-site units, of which `allocated` are secured
+    (accepted by the bank) and `pending` are requested but not yet accepted.
     """
     allocated = allocated or {}
+    pending = pending or {}
     baseline = {c: Decimal(0) for c in CATEGORIES}
     proposed = {c: Decimal(0) for c in CATEGORIES}
 
@@ -72,6 +76,7 @@ def summarise(
         prop = proposed[category]
         change = prop - base
         taken = allocated.get(category, Decimal(0))
+        waiting = pending.get(category, Decimal(0))
 
         entry = {
             "category": category,
@@ -81,6 +86,7 @@ def summarise(
             # None when there is no baseline to compare against
             "change_percent": _round(change / base * 100) if base > 0 else None,
             "allocated_units": _round(taken),
+            "pending_units": _round(waiting),
         }
 
         if role == "habitat_bank":

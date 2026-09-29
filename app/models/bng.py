@@ -38,6 +38,20 @@ BNG_WORKFLOWS = (BNG_HABITAT_BANK_WORKFLOW, BNG_DEVELOPMENT_WORKFLOW)
 
 # Step whose submission records the off-site allocation (see bng_activities).
 BNG_ALLOCATION_STEP = "offsite_allocation"
+# Habitat bank step holding its unit prices and delivery cost.
+BNG_PRICING_STEP = "unit_pricing"
+
+# Unit lifecycle of an allocation (Phase 2 marketplace):
+#   requested -> reserved (bank accepts) -> allocated (planning permission)
+#   -> retired (gain plan approved; a transaction record is created).
+#   declined (bank) and released (developer) free the units again.
+ALLOCATION_STATUSES = ("requested", "reserved", "allocated", "retired", "declined", "released")
+# Statuses that hold a habitat bank's units.
+ACTIVE_ALLOCATION_STATUSES = ("requested", "reserved", "allocated", "retired")
+# Accepted by the habitat bank: counted as secured for the development.
+ACCEPTED_ALLOCATION_STATUSES = ("reserved", "allocated", "retired")
+# Can no longer be changed or released.
+LOCKED_ALLOCATION_STATUSES = ("allocated", "retired")
 
 _CATEGORY_CHECK = "category IN ('area', 'hedgerow', 'watercourse')"
 
@@ -171,8 +185,11 @@ class BngStepData(ActorStampMixin, Base):
 class BngUnitAllocation(ActorStampMixin, Base):
     """
     Units a development takes from a habitat bank (the link between the two
-    workflows). The bng_unit_allocations_capacity trigger rejects any
-    allocation that would take more of a category than the bank's uplift.
+    workflows), with their lifecycle status (ALLOCATION_STATUSES) and the
+    unit prices at the time of the request. Rows are never deleted, so the
+    history stays. The bng_unit_allocations_capacity trigger rejects any
+    active allocation that would take more of a category than the bank's
+    uplift.
     """
 
     __tablename__ = "bng_unit_allocations"
@@ -193,6 +210,10 @@ class BngUnitAllocation(ActorStampMixin, Base):
             "development_case_id <> habitat_bank_case_id",
             name="ck_bng_unit_allocations_different_cases",
         ),
+        CheckConstraint(
+            "status IN ('requested', 'reserved', 'allocated', 'retired', 'declined', 'released')",
+            name="ck_bng_unit_allocations_status",
+        ),
         {"schema": CASE_DATA_SCHEMA},
     )
 
@@ -211,11 +232,60 @@ class BngUnitAllocation(ActorStampMixin, Base):
     hedgerow_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False, default=0)
     watercourse_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False, default=0)
 
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="requested")
+    # Price per unit when requested (from the bank's unit_pricing step).
+    price_per_habitat_unit: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    price_per_hedgerow_unit: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    price_per_watercourse_unit: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    total_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    allocated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class BngTransaction(ActorStampMixin, Base):
+    """
+    Permanent record of units retired for a development's biodiversity gain
+    plan (diagram step 17), one per retired allocation. Its reference goes on
+    the gain plan. The bng_transactions_immutable trigger stops changes.
+    """
+
+    __tablename__ = "bng_transactions"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reference: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    allocation_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.bng_unit_allocations.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    development_case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    habitat_bank_case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    habitat_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    hedgerow_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    watercourse_units: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    total_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 
@@ -243,7 +313,8 @@ BEGIN
                     ELSE watercourse_units END), 0)
           INTO allocated
           FROM {CASE_DATA_SCHEMA}.bng_unit_allocations
-         WHERE habitat_bank_case_id = NEW.habitat_bank_case_id;
+         WHERE habitat_bank_case_id = NEW.habitat_bank_case_id
+           AND status IN ('requested', 'reserved', 'allocated', 'retired');
 
         SELECT GREATEST(COALESCE(SUM(CASE phase WHEN 'proposed' THEN units ELSE -units END), 0), 0)
           INTO available
@@ -282,3 +353,31 @@ event.listen(
 )
 event.listen(BngUnitAllocation.__table__, "after_create", DDL(ALLOCATION_CAPACITY_TRIGGER_DROP_SQL))
 event.listen(BngUnitAllocation.__table__, "after_create", DDL(ALLOCATION_CAPACITY_TRIGGER_SQL))
+
+
+# ---------------------------------------------------------
+# Transaction records cannot be changed
+# ---------------------------------------------------------
+
+TRANSACTION_IMMUTABLE_FUNCTION_SQL = f"""
+CREATE OR REPLACE FUNCTION {CASE_DATA_SCHEMA}.bng_transactions_immutable()
+RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'bng_transaction_immutable: transaction records cannot be changed'
+        USING ERRCODE = 'check_violation';
+END;
+$$ LANGUAGE plpgsql;
+"""
+
+TRANSACTION_IMMUTABLE_TRIGGER_DROP_SQL = (
+    f"DROP TRIGGER IF EXISTS bng_transactions_immutable ON {CASE_DATA_SCHEMA}.bng_transactions"
+)
+TRANSACTION_IMMUTABLE_TRIGGER_SQL = f"""
+CREATE TRIGGER bng_transactions_immutable
+    BEFORE UPDATE ON {CASE_DATA_SCHEMA}.bng_transactions
+    FOR EACH ROW EXECUTE FUNCTION {CASE_DATA_SCHEMA}.bng_transactions_immutable()
+"""
+
+event.listen(BngTransaction.__table__, "after_create", DDL(TRANSACTION_IMMUTABLE_FUNCTION_SQL))
+event.listen(BngTransaction.__table__, "after_create", DDL(TRANSACTION_IMMUTABLE_TRIGGER_DROP_SQL))
+event.listen(BngTransaction.__table__, "after_create", DDL(TRANSACTION_IMMUTABLE_TRIGGER_SQL))

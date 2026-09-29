@@ -753,7 +753,7 @@
           "stage": "Habitat Bank / Landowner",
           "actor": "Habitat Bank",
           "activity": "save_bng_hmmp_step",
-          "next": "legal_security",
+          "next": "unit_pricing",
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -800,6 +800,52 @@
               "name": "reporting_obligations",
               "display_name": "Reporting Obligations",
               "help_text": "What will be reported, to whom and when.",
+              "type": "textarea",
+              "required": false
+            }
+          ]
+        },
+        "unit_pricing": {
+          "title": "Unit Pricing",
+          "stage": "Habitat Bank / Landowner",
+          "actor": "Habitat Bank / Investor",
+          "activity": "save_bng_unit_pricing_step",
+          "next": "legal_security",
+          "ui_mode": "form",
+          "submit_mode": "json",
+          "fields": [
+            {
+              "name": "price_per_habitat_unit",
+              "display_name": "Price per Habitat Unit (GBP)",
+              "help_text": "What a development pays for one area habitat unit from this habitat bank.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "price_per_hedgerow_unit",
+              "display_name": "Price per Hedgerow Unit (GBP)",
+              "help_text": "What a development pays for one hedgerow unit. Leave empty if the bank has no hedgerow uplift.",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "price_per_watercourse_unit",
+              "display_name": "Price per Watercourse Unit (GBP)",
+              "help_text": "What a development pays for one watercourse unit. Leave empty if the bank has no watercourse uplift.",
+              "type": "number",
+              "required": false
+            },
+            {
+              "name": "delivery_cost",
+              "display_name": "Delivery Cost, 30 years (GBP)",
+              "help_text": "The expected total cost of creating the habitats and managing and monitoring them for 30 years. Used to compare against the revenue from selling units.",
+              "type": "number",
+              "required": true
+            },
+            {
+              "name": "pricing_notes",
+              "display_name": "Pricing Notes",
+              "help_text": "Anything else about pricing, such as discounts or indexation.",
               "type": "textarea",
               "required": false
             }
@@ -1134,10 +1180,17 @@
               "type": "textarea",
               "required": false
             }
+          ],
+          "next_if": [
+            {
+              "field": "onsite_decision",
+              "equals": "10% net gain achieved on-site",
+              "next": "planning_application"
+            }
           ]
         },
         "offsite_allocation": {
-          "title": "Off-Site Unit Allocation",
+          "title": "Off-Site Unit Reservation",
           "stage": "Developer / Planning",
           "actor": "Developer / Platform",
           "activity": "save_bng_offsite_allocation_step",
@@ -1150,7 +1203,7 @@
               "display_name": "Off-site units",
               "type": "bng_allocation",
               "required": false,
-              "help_text": "Units taken from registered habitat banks to cover the shortfall. Units allocated here are no longer available to other developments."
+              "help_text": "Request units from registered habitat banks to cover the shortfall. The habitat bank accepts or declines each request; accepted units are reserved for this development, become allocated when planning permission is granted, and are retired when the gain plan is approved."
             }
           ]
         },
@@ -1198,7 +1251,7 @@
             {
               "name": "decision",
               "display_name": "Decision",
-              "help_text": "The planning authority's decision.",
+              "help_text": "The planning authority's decision. When permission is granted, the development's reserved off-site units become allocated.",
               "type": "select",
               "required": true,
               "options": [
@@ -1269,7 +1322,7 @@
             {
               "name": "gain_plan_reference",
               "display_name": "Gain Plan Reference",
-              "help_text": "The reference of the approved biodiversity gain plan.",
+              "help_text": "The reference of the approved biodiversity gain plan. Approving it retires the allocated off-site units (they can never be used again) and creates a transaction record for each.",
               "type": "text",
               "required": true
             },
