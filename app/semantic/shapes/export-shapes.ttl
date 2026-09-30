@@ -1,0 +1,66 @@
+# SHACL shapes: what a valid project export must look like. Checked by
+# tests/test_semantic_export.py. {{BASE}} is replaced as in the mappings.
+# Add a shape here when adding a mapping, so a broken mapping fails the tests.
+
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix schema: <https://schema.org/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix bfx: <{{BASE}}ext#> .
+@prefix shape: <{{BASE}}shapes#> .
+
+shape:Project a sh:NodeShape ;
+  sh:targetClass biofineu:NbSProduct, bfx:HabitatBank, bfx:Development ;
+  sh:property [ sh:path dcterms:created ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+  sh:property [ sh:path bfx:pathway ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path dcterms:title ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+  sh:property [ sh:path bfx:workflowStatus ; sh:in ( "draft" "in_progress" "completed" ) ] .
+
+shape:NbS a sh:NodeShape ;
+  sh:targetClass biofineu:NbS ;
+  sh:property [ sh:path biofineu:containsNbSProduct ; sh:minCount 1 ] ;
+  sh:property [ sh:path bfx:hasNbSType ; sh:maxCount 1 ; sh:class skos:Concept ] ;
+  sh:property [ sh:path biofineu:locatedInNUTSRegion ; sh:nodeKind sh:IRI ;
+    sh:pattern "^http://data.europa.eu/nuts/code/[A-Z]{2}$" ] .
+
+shape:Site a sh:NodeShape ;
+  sh:targetClass bfx:Site ;
+  sh:property [ sh:path geo:hasGeometry ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path bfx:locationType ; sh:in ( "point" "polygon" ) ] ;
+  sh:property [ sh:path geo:hasMetricArea ; sh:datatype xsd:double ] .
+
+shape:Geometry a sh:NodeShape ;
+  sh:targetClass geo:Geometry ;
+  sh:property [ sh:path geo:asWKT ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype geo:wktLiteral ] .
+
+shape:MonetaryAmount a sh:NodeShape ;
+  sh:targetClass schema:MonetaryAmount ;
+  sh:property [ sh:path schema:value ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:decimal ] ;
+  sh:property [ sh:path schema:currency ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^[A-Z]{3}$" ] .
+
+shape:Concept a sh:NodeShape ;
+  sh:targetClass skos:Concept ;
+  sh:property [ sh:path skos:inScheme ; sh:minCount 1 ] ;
+  sh:property [ sh:path skos:prefLabel ; sh:minCount 1 ] .
+
+shape:HabitatParcel a sh:NodeShape ;
+  sh:targetClass bfx:HabitatParcel ;
+  sh:property [ sh:path bfx:phase ; sh:minCount 1 ; sh:in ( "baseline" "proposed" ) ] ;
+  sh:property [ sh:path bfx:habitatCategory ; sh:in ( "area" "hedgerow" "watercourse" ) ] ;
+  sh:property [ sh:path bfx:biodiversityUnits ; sh:datatype xsd:decimal ] ;
+  sh:property [ sh:path bfx:sizeUnit ; sh:nodeKind sh:IRI ] .
+
+shape:UnitAllocation a sh:NodeShape ;
+  sh:targetClass bfx:UnitAllocation ;
+  sh:property [ sh:path bfx:allocationStatus ; sh:minCount 1 ;
+    sh:in ( "requested" "reserved" "allocated" "retired" "declined" "released" ) ] ;
+  sh:property [ sh:path bfx:developmentProject ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path bfx:habitatBankProject ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+shape:MonitoringReport a sh:NodeShape ;
+  sh:targetClass biofineu:MonitoringReport ;
+  sh:property [ sh:path biofineu:reportsOn ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path bfx:monitoringStatus ; sh:in ( "due" "submitted" "passed" "failed" "remediated" ) ] .

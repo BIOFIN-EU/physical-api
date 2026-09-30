@@ -53,3 +53,9 @@ minio==7.2.20
 pytest==8.4.2
 pytest-asyncio==1.2.0
 
+# --- Semantic export (app/semantic): R2RML -> RDF -> JSON-LD ---
+# app/semantic/service.py uses Morph-KGC internals: check it when upgrading.
+morph-kgc==2.10.0
+rdflib==7.2.1
+PyLD==3.3.0
+pyshacl==0.31.0

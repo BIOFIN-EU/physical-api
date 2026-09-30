@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -22,6 +24,9 @@ class Settings(BaseSettings):
     AUTH_URL: str
     AUTH_CLIENT_ID: str = "api_physical"
     AUTH_CLIENT_SECRET: str
+
+    # JSON-LD export (app/semantic): IRIs are https://ontology.<env>.biofindashboard.eu/...
+    SEMANTIC_ENV: Literal["dev", "prd"] = "dev"
 
     RISK_URL: str = "https://api.dev.biofindashboard.eu/api/vulnerability/"
     # Priority calculations can take a long time when the framework has no

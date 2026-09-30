@@ -1,0 +1,131 @@
+# R2RML: financing, funding requirements, investment rationale and
+# identifiers of the project. Tokens as in ./project.r2rml.ttl.
+#
+# Amounts are schema:MonetaryAmount nodes (schema:value + schema:currency,
+# an ISO 4217 code).
+
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix schema: <https://schema.org/> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix fibo-loan: <https://spec.edmcouncil.org/fibo/ontology/LOAN/LoansSpecific/LoanProducts/> .
+@prefix bfx: <{{BASE}}ext#> .
+
+# ---------------------------------------------------------------------
+# Financial step: the loan (biofineu:usesFinancialInstrument -> fibo Loan)
+# and what it is for (biofineu:hasFinancingPurpose -> use-of-proceeds
+# concept, typed as a FIBO Objective in ./vocabularies.r2rml.ttl).
+# ---------------------------------------------------------------------
+<#Loan> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, nature_positive_percentage::text AS nature_positive_percentage, notes
+    FROM case_data.case_financials WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/loan/{id}" ; rr:class fibo-loan:Loan ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:principalAmount ; rr:objectMap [ rr:template "{{BASE}}data/loan/{id}/amount" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:naturePositivePercentage ; rr:objectMap [ rr:column "nature_positive_percentage" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:comment ; rr:objectMap [ rr:column "notes" ] ] .
+
+<#LoanAmount> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, loan_amount::text AS amount, currency
+    FROM case_data.case_financials WHERE case_id = {{CASE_ID}} AND loan_amount IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/loan/{id}/amount" ; rr:class schema:MonetaryAmount ] ;
+  rr:predicateObjectMap [ rr:predicate schema:value ; rr:objectMap [ rr:column "amount" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate schema:currency ; rr:objectMap [ rr:column "currency" ] ] .
+
+<#ProjectLoan> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT f.id, f.case_id, u.code AS use_of_proceeds
+    FROM case_data.case_financials f
+    LEFT JOIN case_data.use_of_proceeds u ON u.id = f.use_of_proceeds_id
+    WHERE f.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:usesFinancialInstrument ; rr:objectMap [ rr:template "{{BASE}}data/loan/{id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasFinancingPurpose ; rr:objectMap [ rr:template "{{BASE}}concept/use-of-proceeds/{use_of_proceeds}" ] ] .
+
+<#ProjectFinancingType> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT cf.case_id, t.code
+    FROM case_data.case_financing_types cf
+    JOIN case_data.financing_types t ON t.id = cf.financing_type_id
+    WHERE cf.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:financingType ; rr:objectMap [ rr:template "{{BASE}}concept/financing-type/{code}" ] ] .
+
+# ---------------------------------------------------------------------
+# Funding requirements: one bfx:FundingRequirement with an amount per kind.
+# ---------------------------------------------------------------------
+<#FundingRequirement> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id, funding_notes FROM case_data.case_funding_requirements WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/funding-requirement/{id}" ; rr:class bfx:FundingRequirement ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:comment ; rr:objectMap [ rr:column "funding_notes" ] ] .
+
+<#ProjectFundingRequirement> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id FROM case_data.case_funding_requirements WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasFundingRequirement ; rr:objectMap [ rr:template "{{BASE}}data/funding-requirement/{id}" ] ] .
+
+# One row per amount kind (kind = the bfx property's local name).
+<#FundingAmountLink> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT r.id, a.kind
+    FROM case_data.case_funding_requirements r
+    CROSS JOIN LATERAL (VALUES
+      ('totalFunding', r.funding_amount), ('upfrontCosts', r.upfront_costs),
+      ('maintenanceCosts', r.maintenance_costs), ('directFunding', r.direct_funding_amount),
+      ('indirectFunding', r.indirect_funding_amount)
+    ) AS a(kind, amount)
+    WHERE r.case_id = {{CASE_ID}} AND a.amount IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/funding-requirement/{id}" ] ;
+  rr:predicateObjectMap [
+    rr:predicateMap [ rr:template "{{BASE}}ext#{kind}" ] ;
+    rr:objectMap [ rr:template "{{BASE}}data/funding-requirement/{id}/{kind}" ]
+  ] .
+
+<#FundingAmount> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT r.id, r.currency, a.kind, a.amount::text AS amount
+    FROM case_data.case_funding_requirements r
+    CROSS JOIN LATERAL (VALUES
+      ('totalFunding', r.funding_amount), ('upfrontCosts', r.upfront_costs),
+      ('maintenanceCosts', r.maintenance_costs), ('directFunding', r.direct_funding_amount),
+      ('indirectFunding', r.indirect_funding_amount)
+    ) AS a(kind, amount)
+    WHERE r.case_id = {{CASE_ID}} AND a.amount IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/funding-requirement/{id}/{kind}" ; rr:class schema:MonetaryAmount ] ;
+  rr:predicateObjectMap [ rr:predicate schema:value ; rr:objectMap [ rr:column "amount" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate schema:currency ; rr:objectMap [ rr:column "currency" ] ] .
+
+# ---------------------------------------------------------------------
+# Investment rationale and identifiers (text on the project).
+# ---------------------------------------------------------------------
+<#InvestmentRationale> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id, nature_positive_benefits, legislation_compliance, additional_rationale
+    FROM case_data.case_investment_rationales WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:naturePositiveBenefits ; rr:objectMap [ rr:column "nature_positive_benefits" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:legislationCompliance ; rr:objectMap [ rr:column "legislation_compliance" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:additionalRationale ; rr:objectMap [ rr:column "additional_rationale" ] ] .
+
+<#Identifiers> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id, organic_farmer_number, environment_scheme_number, subsidy_reference
+    FROM case_data.case_identifiers WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:organicFarmerNumber ; rr:objectMap [ rr:column "organic_farmer_number" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:environmentSchemeNumber ; rr:objectMap [ rr:column "environment_scheme_number" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:subsidyReference ; rr:objectMap [ rr:column "subsidy_reference" ] ] .

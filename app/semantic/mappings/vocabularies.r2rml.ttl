@@ -1,0 +1,164 @@
+# R2RML: lookup tables as SKOS concept schemes (one scheme per table).
+# {{BASE}} is replaced by the base IRI (setting SEMANTIC_ENV). Concepts are
+# {{BASE}}concept/<scheme>/<code>; the schemes themselves are described in
+# ../data/concept-schemes.ttl. Every concept is exported; the JSON-LD
+# document only keeps the ones a project refers to.
+
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix bfx: <{{BASE}}ext#> .
+@prefix fibo-fnd-gao-obj: <https://spec.edmcouncil.org/fibo/ontology/FND/GoalsAndObjectives/Objectives/> .
+
+<#NbsTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-type> ] .
+
+<#NbsEnvironmentTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_environment_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-environment-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-environment-type> ] .
+
+<#NbsApproachTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_approach_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-approach-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-approach-type> ] .
+
+<#NbsInterventionTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description, intervention_type FROM case_data.nbs_intervention_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-intervention-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:interventionCategory ; rr:objectMap [ rr:column "intervention_type" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-intervention-type> ] .
+
+<#NbsSocietalChallengeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_societal_challenge_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-societal-challenge/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-societal-challenge> ] .
+
+<#ImplementationStageConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.implementation_stages""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/implementation-stage/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/implementation-stage> ] .
+
+<#FinancingTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.financing_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/financing-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/financing-type> ] .
+
+<#UseOfProceedsConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.use_of_proceeds""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/use-of-proceeds/{code}" ; rr:class skos:Concept , fibo-fnd-gao-obj:Objective ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/use-of-proceeds> ] .
+
+<#OperatorSpecialtyConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.operator_specialties""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/operator-specialty/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/operator-specialty> ] .
+
+<#IntermediaryFunctionConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description, function_category FROM case_data.intermediary_functions""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/intermediary-function/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:functionCategory ; rr:objectMap [ rr:column "function_category" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/intermediary-function> ] .
+
+<#BngHabitatTypeConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description, category, distinctiveness, distinctiveness_score::text AS distinctiveness_score FROM case_data.bng_habitat_types""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/bng-habitat-type/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatCategory ; rr:objectMap [ rr:column "category" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:distinctiveness ; rr:objectMap [ rr:column "distinctiveness" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:distinctivenessScore ; rr:objectMap [ rr:column "distinctiveness_score" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/bng-habitat-type> ] .
+
+<#BngConditionConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description, multiplier::text AS multiplier FROM case_data.bng_conditions""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/bng-condition/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:multiplier ; rr:objectMap [ rr:column "multiplier" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/bng-condition> ] .
+
+<#BngStrategicSignificanceConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description, multiplier::text AS multiplier FROM case_data.bng_strategic_significance""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/bng-strategic-significance/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:multiplier ; rr:objectMap [ rr:column "multiplier" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/bng-strategic-significance> ] .
+
+# Currencies: ISO 4217 codes, matched to the EU Publications Office currency list.
+<#CurrencyConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT code, name FROM case_data.currencies""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/currency/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:exactMatch ; rr:objectMap [ rr:template "http://publications.europa.eu/resource/authority/currency/{code}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/currency> ] .
+
+# Countries: ISO 3166 alpha-2 codes, matched to the EU Publications Office
+# country list (alpha-3 codes). Countries without an entry below (Kosovo,
+# "Multiple Countries") get no match. Add a row to the VALUES list for a new
+# country.
+<#CountryConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT c.code, c.name, m.iso3
+    FROM case_data.countries c
+    LEFT JOIN (VALUES
+      ('AD','AND'),('AL','ALB'),('AT','AUT'),('BA','BIH'),('BE','BEL'),('BG','BGR'),('BR','BRA'),
+      ('BY','BLR'),('CH','CHE'),('CY','CYP'),('CZ','CZE'),('DE','DEU'),('DK','DNK'),('EE','EST'),
+      ('ES','ESP'),('FI','FIN'),('FR','FRA'),('GB','GBR'),('GI','GIB'),('GR','GRC'),('HR','HRV'),
+      ('HU','HUN'),('IE','IRL'),('IS','ISL'),('IT','ITA'),('LI','LIE'),('LT','LTU'),('LU','LUX'),
+      ('LV','LVA'),('MC','MCO'),('MD','MDA'),('ME','MNE'),('MK','MKD'),('MT','MLT'),('NL','NLD'),
+      ('NO','NOR'),('PL','POL'),('PT','PRT'),('RO','ROU'),('RS','SRB'),('RU','RUS'),('SE','SWE'),
+      ('SI','SVN'),('SK','SVK'),('SM','SMR'),('UA','UKR'),('VA','VAT')
+    ) AS m(iso2, iso3) ON m.iso2 = c.code
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/country/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:exactMatch ; rr:objectMap [ rr:template "http://publications.europa.eu/resource/authority/country/{iso3}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/country> ] .
+
+# Pathways: one concept per workflow definition (code from workflows.json).
+<#PathwayConcepts> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT DISTINCT code FROM workflow.workflow_definitions""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}concept/pathway/{code}" ; rr:class skos:Concept ] ;
+  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/pathway> ] .

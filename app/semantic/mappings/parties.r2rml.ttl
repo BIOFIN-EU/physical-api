@@ -1,0 +1,103 @@
+# R2RML: operators and intermediaries of the project, and its documents.
+# Tokens as in ./project.r2rml.ttl.
+#
+# Left out on purpose: contact details (email, phone, address, contact
+# details, notes) of operators and intermediaries, and the storage details
+# of documents (bucket, object key, upload token, stored file name).
+
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix commons-pty: <https://www.omg.org/spec/Commons/PartiesAndSituations/> .
+@prefix bfx: <{{BASE}}ext#> .
+
+# ---------------------------------------------------------------------
+# Operators: parties with the base ontology's operator role.
+# ---------------------------------------------------------------------
+<#Operator> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT o.id, o.name, s.code AS specialty
+    FROM case_data.operators o
+    LEFT JOIN case_data.operator_specialties s ON s.id = o.operator_specialty_id
+    WHERE o.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/operator/{id}" ; rr:class commons-pty:Party ] ;
+  rr:predicateObjectMap [ rr:predicate foaf:name, rdfs:label ; rr:objectMap [ rr:column "name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:operatorSpecialty ; rr:objectMap [ rr:template "{{BASE}}concept/operator-specialty/{specialty}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasRole ; rr:objectMap [ rr:template "{{BASE}}data/operator/{id}/role" ] ] .
+
+<#OperatorRole> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id FROM case_data.operators WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/operator/{id}/role" ; rr:class biofineu:OperatorRole ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:heldBy ; rr:objectMap [ rr:template "{{BASE}}data/operator/{id}" ] ] .
+
+<#ProjectOperator> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.operators WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasOperator ; rr:objectMap [ rr:template "{{BASE}}data/operator/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Intermediaries: a bfx:IntermediaryRole per assigned function (the base
+# ontology's roles - auditor, certifier, funder ... - don't match the
+# dashboard's intermediary functions).
+# ---------------------------------------------------------------------
+<#IntermediaryRole> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT ci.id, ci.case_id, ci.intermediary_id, f.code AS function
+    FROM case_data.case_intermediaries ci
+    JOIN case_data.intermediaries i ON i.id = ci.intermediary_id AND i.deleted_at IS NULL
+    LEFT JOIN case_data.intermediary_functions f ON f.id = ci.intermediary_function_id
+    WHERE ci.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/intermediary-role/{id}" ; rr:class bfx:IntermediaryRole ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:heldBy ; rr:objectMap [ rr:template "{{BASE}}data/intermediary/{intermediary_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:intermediaryFunction ; rr:objectMap [ rr:template "{{BASE}}concept/intermediary-function/{function}" ] ] .
+
+<#ProjectIntermediaryRole> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT ci.id, ci.case_id
+    FROM case_data.case_intermediaries ci
+    JOIN case_data.intermediaries i ON i.id = ci.intermediary_id AND i.deleted_at IS NULL
+    WHERE ci.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:involvesRole ; rr:objectMap [ rr:template "{{BASE}}data/intermediary-role/{id}" ] ] .
+
+<#Intermediary> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT i.id, i.name, ci.id AS role_id
+    FROM case_data.case_intermediaries ci
+    JOIN case_data.intermediaries i ON i.id = ci.intermediary_id AND i.deleted_at IS NULL
+    WHERE ci.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/intermediary/{id}" ; rr:class commons-pty:Party ] ;
+  rr:predicateObjectMap [ rr:predicate foaf:name, rdfs:label ; rr:objectMap [ rr:column "name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasRole ; rr:objectMap [ rr:template "{{BASE}}data/intermediary-role/{role_id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Documents uploaded in the pathway (file steps).
+# ---------------------------------------------------------------------
+<#Document> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id, step_code, field_name, original_filename, content_type,
+      size_bytes::text AS size_bytes, notes,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created
+    FROM case_data.case_documents WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/document/{id}" ; rr:class foaf:Document ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:title ; rr:objectMap [ rr:column "original_filename" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:format ; rr:objectMap [ rr:column "content_type" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcat:byteSize ; rr:objectMap [ rr:column "size_bytes" ; rr:datatype xsd:nonNegativeInteger ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:stepCode ; rr:objectMap [ rr:column "step_code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:fieldName ; rr:objectMap [ rr:column "field_name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:comment ; rr:objectMap [ rr:column "notes" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:created ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] .
+
+<#ProjectDocument> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.case_documents WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasSupportingDocument ; rr:objectMap [ rr:template "{{BASE}}data/document/{id}" ] ] .

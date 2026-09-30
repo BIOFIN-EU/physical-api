@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import status, case_workflow, lookups, intermediaries, support, risk, bng
+from app.routers import status, case_workflow, lookups, intermediaries, support, risk, bng, semantic
 
 
 api_router = APIRouter()
@@ -36,3 +36,7 @@ api_router.include_router(risk.router,
 api_router.include_router(bng.router,
                           prefix=f"{std_prefix}/bng",
                           tags=["Biodiversity Net Gain"])
+
+api_router.include_router(semantic.router,
+                          prefix=f"{std_prefix}/semantic",
+                          tags=["Semantic export (JSON-LD)"])
