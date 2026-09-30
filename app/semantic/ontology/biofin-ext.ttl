@@ -1,0 +1,365 @@
+# BIOFIN-EU dashboard extensions to the BIOFIN-EU ontology (https://w3id.org/biofineu/).
+#
+# Terms the dashboard's data needs that the base ontology does not (yet)
+# define. Each is linked to the base ontology or a standard vocabulary where
+# one fits (rdfs:subClassOf / rdfs:subPropertyOf), so tools that only know
+# those still understand most of the data.
+#
+# {{BASE}} is replaced when the file is served or used: by
+# https://ontology.dev.biofindashboard.eu/ or https://ontology.prd.biofindashboard.eu/
+# (setting SEMANTIC_ENV). Candidates to move into the base ontology are
+# marked "Candidate for biofineu".
+
+@prefix bfx: <{{BASE}}ext#> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix commons-pty: <https://www.omg.org/spec/Commons/PartiesAndSituations/> .
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fibo-fnd-agr: <https://spec.edmcouncil.org/fibo/ontology/FND/Agreements/Contracts/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <https://schema.org/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<{{BASE}}ext>
+  a owl:Ontology ;
+  owl:imports <https://w3id.org/biofineu/> ;
+  dcterms:title "BIOFIN-EU dashboard ontology extensions"@en ;
+  dcterms:description "Terms used by the BIOFIN-EU dashboard's JSON-LD project export that the BIOFIN-EU ontology does not define: pathway data, funding, parties and the Biodiversity Net Gain (BNG) prototype."@en ;
+  owl:versionInfo "0.1" ;
+.
+
+# =====================================================================
+# Projects and pathways
+# =====================================================================
+
+bfx:pathway a owl:ObjectProperty ;
+  rdfs:label "pathway"@en ;
+  rdfs:comment "The dashboard pathway (workflow) the project follows, as a concept of the pathway scheme."@en ;
+  rdfs:range skos:Concept .
+
+bfx:workflowStatus a owl:DatatypeProperty ;
+  rdfs:label "workflow status"@en ;
+  rdfs:comment "Where the project is in its pathway: draft, in_progress or completed."@en ;
+  rdfs:range xsd:string .
+
+# =====================================================================
+# Nature-based solution classification (the NbS step)
+# Candidate for biofineu: the base ontology has biofineu:NbS but no
+# properties for these classifications.
+# =====================================================================
+
+bfx:hasNbSType a owl:ObjectProperty ;
+  rdfs:label "has NbS type"@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:hasEnvironmentType a owl:ObjectProperty ;
+  rdfs:label "has environment type"@en ;
+  rdfs:comment "The ecosystem type (EU MAES classes). Not biofineu:hasLandCoverClassification, which expects CORINE land cover classes."@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:hasApproachType a owl:ObjectProperty ;
+  rdfs:label "has approach type"@en ;
+  rdfs:comment "The IUCN family of NbS approaches."@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:hasInterventionType a owl:ObjectProperty ;
+  rdfs:label "has intervention type"@en ;
+  rdfs:comment "The type of intervention (Type 1 protection, Type 2 management, Type 3 restoration and creation)."@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:addressesSocietalChallenge a owl:ObjectProperty ;
+  rdfs:label "addresses societal challenge"@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:hasImplementationStage a owl:ObjectProperty ;
+  rdfs:label "has implementation stage"@en ;
+  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
+
+bfx:interventionCategory a owl:DatatypeProperty ;
+  rdfs:label "intervention category"@en ;
+  rdfs:comment "type_1, type_2 or type_3 of an intervention type concept."@en ;
+  rdfs:range xsd:string .
+
+# =====================================================================
+# Sites (project locations)
+# =====================================================================
+
+bfx:Site a owl:Class ;
+  rdfs:label "Site"@en ;
+  rdfs:comment "A location of a project: a point or a polygon."@en ;
+  rdfs:subClassOf geo:Feature .
+
+bfx:hasSite a owl:ObjectProperty ;
+  rdfs:label "has site"@en ;
+  rdfs:range bfx:Site .
+
+bfx:country a owl:ObjectProperty ;
+  rdfs:label "country"@en ;
+  rdfs:comment "The country a site is in, as a concept matched to the EU country authority list."@en ;
+  rdfs:domain bfx:Site ; rdfs:range skos:Concept .
+
+bfx:locationType a owl:DatatypeProperty ;
+  rdfs:label "location type"@en ;
+  rdfs:comment "point or polygon."@en ;
+  rdfs:range xsd:string .
+
+# =====================================================================
+# Financing and funding
+# =====================================================================
+
+bfx:financingType a owl:ObjectProperty ;
+  rdfs:label "financing type"@en ;
+  rdfs:comment "Private, public, hybrid, blended or philanthropic financing."@en ;
+  rdfs:domain biofineu:NbSProduct ; rdfs:range skos:Concept .
+
+bfx:principalAmount a owl:ObjectProperty ;
+  rdfs:label "principal amount"@en ;
+  rdfs:comment "The amount of a loan."@en ;
+  rdfs:range schema:MonetaryAmount .
+
+bfx:naturePositivePercentage a owl:DatatypeProperty ;
+  rdfs:label "nature-positive percentage"@en ;
+  rdfs:comment "Share of the loan used for nature-positive purposes, in percent."@en ;
+  rdfs:range xsd:decimal .
+
+bfx:FundingRequirement a owl:Class ;
+  rdfs:label "Funding requirement"@en ;
+  rdfs:comment "What a project needs to be funded: total, upfront and maintenance costs, and direct and indirect funding."@en .
+
+bfx:hasFundingRequirement a owl:ObjectProperty ;
+  rdfs:label "has funding requirement"@en ;
+  rdfs:range bfx:FundingRequirement .
+
+bfx:totalFunding a owl:ObjectProperty ; rdfs:label "total funding"@en ; rdfs:range schema:MonetaryAmount .
+bfx:upfrontCosts a owl:ObjectProperty ; rdfs:label "upfront costs"@en ; rdfs:range schema:MonetaryAmount .
+bfx:maintenanceCosts a owl:ObjectProperty ; rdfs:label "maintenance costs"@en ; rdfs:range schema:MonetaryAmount .
+bfx:directFunding a owl:ObjectProperty ; rdfs:label "direct funding"@en ; rdfs:range schema:MonetaryAmount .
+bfx:indirectFunding a owl:ObjectProperty ; rdfs:label "indirect funding"@en ; rdfs:range schema:MonetaryAmount .
+
+bfx:naturePositiveBenefits a owl:DatatypeProperty ;
+  rdfs:label "nature-positive benefits"@en ; rdfs:comment "Investment rationale: the nature-positive benefits."@en ; rdfs:range xsd:string .
+bfx:legislationCompliance a owl:DatatypeProperty ;
+  rdfs:label "legislation compliance"@en ; rdfs:comment "Investment rationale: how the project complies with legislation."@en ; rdfs:range xsd:string .
+bfx:additionalRationale a owl:DatatypeProperty ;
+  rdfs:label "additional rationale"@en ; rdfs:range xsd:string .
+
+bfx:organicFarmerNumber a owl:DatatypeProperty ;
+  rdfs:label "organic farmer number"@en ; rdfs:subPropertyOf dcterms:identifier ; rdfs:range xsd:string .
+bfx:environmentSchemeNumber a owl:DatatypeProperty ;
+  rdfs:label "environment scheme number"@en ; rdfs:subPropertyOf dcterms:identifier ; rdfs:range xsd:string .
+bfx:subsidyReference a owl:DatatypeProperty ;
+  rdfs:label "subsidy reference"@en ; rdfs:subPropertyOf dcterms:identifier ; rdfs:range xsd:string .
+
+# =====================================================================
+# Parties and roles
+# =====================================================================
+
+bfx:IntermediaryRole a owl:Class ;
+  rdfs:label "Intermediary role"@en ;
+  rdfs:comment "A party acting as intermediary on a project, for one intermediary function (bfx:intermediaryFunction)."@en ;
+  rdfs:subClassOf biofineu:Role .
+
+bfx:heldBy a owl:ObjectProperty ;
+  rdfs:label "held by"@en ;
+  rdfs:comment "The party that holds a role (inverse of biofineu:hasRole)."@en ;
+  owl:inverseOf biofineu:hasRole ;
+  rdfs:domain biofineu:Role ; rdfs:range commons-pty:Party .
+
+bfx:intermediaryFunction a owl:ObjectProperty ;
+  rdfs:label "intermediary function"@en ;
+  rdfs:domain bfx:IntermediaryRole ; rdfs:range skos:Concept .
+
+bfx:operatorSpecialty a owl:ObjectProperty ;
+  rdfs:label "operator specialty"@en ;
+  rdfs:domain commons-pty:Party ; rdfs:range skos:Concept .
+
+bfx:functionCategory a owl:DatatypeProperty ;
+  rdfs:label "function category"@en ;
+  rdfs:comment "financial or biodiversity, for an intermediary function concept."@en ;
+  rdfs:range xsd:string .
+
+# =====================================================================
+# Documents
+# =====================================================================
+
+bfx:hasSupportingDocument a owl:ObjectProperty ;
+  rdfs:label "has supporting document"@en ;
+  rdfs:range foaf:Document .
+
+bfx:stepCode a owl:DatatypeProperty ;
+  rdfs:label "step code"@en ;
+  rdfs:comment "The pathway step something was recorded in (the step's code in the workflow configuration)."@en ;
+  rdfs:range xsd:string .
+
+bfx:fieldName a owl:DatatypeProperty ;
+  rdfs:label "field name"@en ;
+  rdfs:comment "The form field something was recorded in."@en ;
+  rdfs:range xsd:string .
+
+# =====================================================================
+# Biodiversity Net Gain (BNG) prototype
+# =====================================================================
+
+bfx:HabitatBank a owl:Class ;
+  rdfs:label "Habitat bank"@en ;
+  rdfs:comment "Land registered to create or enhance habitats and sell the resulting biodiversity units."@en ;
+  rdfs:subClassOf biofineu:NbSProduct .
+
+bfx:Development a owl:Class ;
+  rdfs:label "Development"@en ;
+  rdfs:comment "A development that must deliver biodiversity net gain, on-site or with units from habitat banks."@en ;
+  rdfs:subClassOf prov:Entity .
+
+bfx:DeveloperRole a owl:Class ;
+  rdfs:label "Developer role"@en ; rdfs:subClassOf biofineu:Role .
+bfx:EcologistRole a owl:Class ;
+  rdfs:label "Ecologist role"@en ;
+  rdfs:comment "Assesses habitats and verifies monitoring reports."@en ;
+  rdfs:subClassOf biofineu:Role .
+
+bfx:roleClass a owl:AnnotationProperty ;
+  rdfs:label "role class"@en ;
+  rdfs:comment "Links a BNG role concept to the role class it corresponds to (biofineu:LandOwnerRole, biofineu:FunderRole, biofineu:LocalGovernmentRole, bfx:DeveloperRole, bfx:EcologistRole)."@en .
+
+# --- habitat parcels and the metric ---
+
+bfx:HabitatParcel a owl:Class ;
+  rdfs:label "Habitat parcel"@en ;
+  rdfs:comment "An area (or length, for hedgerows and watercourses) of one habitat, before (baseline) or after (proposed) the project, with its biodiversity units."@en ;
+  rdfs:subClassOf geo:Feature .
+
+bfx:hasHabitatParcel a owl:ObjectProperty ;
+  rdfs:label "has habitat parcel"@en ; rdfs:range bfx:HabitatParcel .
+bfx:phase a owl:DatatypeProperty ;
+  rdfs:label "phase"@en ; rdfs:comment "baseline or proposed."@en ; rdfs:range xsd:string .
+bfx:habitatCategory a owl:DatatypeProperty ;
+  rdfs:label "habitat category"@en ; rdfs:comment "area, hedgerow or watercourse."@en ; rdfs:range xsd:string .
+bfx:habitatType a owl:ObjectProperty ;
+  rdfs:label "habitat type"@en ; rdfs:domain bfx:HabitatParcel ; rdfs:range skos:Concept .
+bfx:habitatCondition a owl:ObjectProperty ;
+  rdfs:label "habitat condition"@en ; rdfs:domain bfx:HabitatParcel ; rdfs:range skos:Concept .
+bfx:strategicSignificance a owl:ObjectProperty ;
+  rdfs:label "strategic significance"@en ; rdfs:domain bfx:HabitatParcel ; rdfs:range skos:Concept .
+bfx:parcelSize a owl:DatatypeProperty ;
+  rdfs:label "parcel size"@en ; rdfs:comment "In the unit given by bfx:sizeUnit."@en ; rdfs:range xsd:decimal .
+bfx:sizeUnit a owl:ObjectProperty ;
+  rdfs:label "size unit"@en ; rdfs:comment "A QUDT unit: hectare for area habitats, kilometre for hedgerows and watercourses."@en .
+bfx:biodiversityUnits a owl:DatatypeProperty ;
+  rdfs:label "biodiversity units"@en ; rdfs:comment "Biodiversity units from the (simplified) statutory metric."@en ; rdfs:range xsd:decimal .
+bfx:distinctiveness a owl:DatatypeProperty ;
+  rdfs:label "distinctiveness"@en ; rdfs:range xsd:string .
+bfx:distinctivenessScore a owl:DatatypeProperty ;
+  rdfs:label "distinctiveness score"@en ; rdfs:range xsd:decimal .
+bfx:multiplier a owl:DatatypeProperty ;
+  rdfs:label "multiplier"@en ; rdfs:comment "Metric multiplier of a condition or strategic significance concept."@en ; rdfs:range xsd:decimal .
+
+# --- unit allocations and transactions ---
+
+bfx:UnitAllocation a owl:Class ;
+  rdfs:label "Unit allocation"@en ;
+  rdfs:comment "Biodiversity units a development requests from, has reserved at, or has been allocated by a habitat bank."@en ;
+  rdfs:subClassOf prov:Entity .
+
+bfx:hasUnitAllocation a owl:ObjectProperty ;
+  rdfs:label "has unit allocation"@en ; rdfs:comment "From the development."@en ; rdfs:range bfx:UnitAllocation .
+bfx:suppliesUnitAllocation a owl:ObjectProperty ;
+  rdfs:label "supplies unit allocation"@en ; rdfs:comment "From the habitat bank."@en ; rdfs:range bfx:UnitAllocation .
+bfx:developmentProject a owl:ObjectProperty ;
+  rdfs:label "development project"@en ; rdfs:range bfx:Development .
+bfx:habitatBankProject a owl:ObjectProperty ;
+  rdfs:label "habitat bank project"@en ; rdfs:range bfx:HabitatBank .
+bfx:allocationStatus a owl:DatatypeProperty ;
+  rdfs:label "allocation status"@en ; rdfs:comment "requested, reserved, allocated, retired, declined or released."@en ; rdfs:range xsd:string .
+bfx:habitatUnits a owl:DatatypeProperty ; rdfs:label "habitat units"@en ; rdfs:range xsd:decimal .
+bfx:hedgerowUnits a owl:DatatypeProperty ; rdfs:label "hedgerow units"@en ; rdfs:range xsd:decimal .
+bfx:watercourseUnits a owl:DatatypeProperty ; rdfs:label "watercourse units"@en ; rdfs:range xsd:decimal .
+bfx:pricePerHabitatUnit a owl:ObjectProperty ; rdfs:label "price per habitat unit"@en ; rdfs:range schema:MonetaryAmount .
+bfx:pricePerHedgerowUnit a owl:ObjectProperty ; rdfs:label "price per hedgerow unit"@en ; rdfs:range schema:MonetaryAmount .
+bfx:pricePerWatercourseUnit a owl:ObjectProperty ; rdfs:label "price per watercourse unit"@en ; rdfs:range schema:MonetaryAmount .
+bfx:totalPrice a owl:ObjectProperty ; rdfs:label "total price"@en ; rdfs:range schema:MonetaryAmount .
+bfx:decidedAt a owl:DatatypeProperty ; rdfs:label "decided at"@en ; rdfs:range xsd:dateTime .
+bfx:allocatedAt a owl:DatatypeProperty ; rdfs:label "allocated at"@en ; rdfs:range xsd:dateTime .
+bfx:retiredAt a owl:DatatypeProperty ; rdfs:label "retired at"@en ; rdfs:range xsd:dateTime .
+bfx:releasedAt a owl:DatatypeProperty ; rdfs:label "released at"@en ; rdfs:range xsd:dateTime .
+
+bfx:UnitTransaction a owl:Class ;
+  rdfs:label "Unit transaction"@en ;
+  rdfs:comment "The immutable record of allocated units being sold to a development."@en ;
+  rdfs:subClassOf prov:Activity .
+
+bfx:hasTransaction a owl:ObjectProperty ;
+  rdfs:label "has transaction"@en ; rdfs:range bfx:UnitTransaction .
+bfx:fromAllocation a owl:ObjectProperty ;
+  rdfs:label "from allocation"@en ; rdfs:domain bfx:UnitTransaction ; rdfs:range bfx:UnitAllocation .
+bfx:transactionReference a owl:DatatypeProperty ;
+  rdfs:label "transaction reference"@en ; rdfs:subPropertyOf dcterms:identifier ; rdfs:range xsd:string .
+bfx:landownerSharePercent a owl:DatatypeProperty ; rdfs:label "landowner share (percent)"@en ; rdfs:range xsd:decimal .
+bfx:investorSharePercent a owl:DatatypeProperty ; rdfs:label "investor share (percent)"@en ; rdfs:range xsd:decimal .
+bfx:managerSharePercent a owl:DatatypeProperty ; rdfs:label "habitat manager share (percent)"@en ; rdfs:range xsd:decimal .
+
+# --- monitoring (biofineu:MonitoringReport) ---
+
+bfx:monitoringYear a owl:DatatypeProperty ;
+  rdfs:label "monitoring year"@en ; rdfs:comment "Years after registration the report is for (1, 2, 5, 10 ... 30)."@en ; rdfs:range xsd:integer .
+bfx:dueDate a owl:DatatypeProperty ; rdfs:label "due date"@en ; rdfs:range xsd:date .
+bfx:monitoringStatus a owl:DatatypeProperty ;
+  rdfs:label "monitoring status"@en ; rdfs:comment "due, submitted, passed, failed or remediated."@en ; rdfs:range xsd:string .
+bfx:habitatsOnTrack a owl:DatatypeProperty ; rdfs:label "habitats on track"@en ; rdfs:range xsd:boolean .
+bfx:conditionSummary a owl:DatatypeProperty ; rdfs:label "condition summary"@en ; rdfs:range xsd:string .
+bfx:managementCarriedOut a owl:DatatypeProperty ; rdfs:label "management carried out"@en ; rdfs:range xsd:string .
+bfx:verificationNotes a owl:DatatypeProperty ; rdfs:label "verification notes"@en ; rdfs:range xsd:string .
+bfx:verifiedAt a owl:DatatypeProperty ; rdfs:label "verified at"@en ; rdfs:range xsd:dateTime .
+bfx:verifiedAsRole a owl:ObjectProperty ;
+  rdfs:label "verified as role"@en ; rdfs:comment "The BNG role that verified the report."@en ; rdfs:range skos:Concept .
+
+bfx:RemedialAction a owl:Class ;
+  rdfs:label "Remedial action"@en ;
+  rdfs:comment "Work required after a failed monitoring report."@en ;
+  rdfs:subClassOf biofineu:NaturePositiveActivity .
+
+bfx:requiresRemedialAction a owl:ObjectProperty ;
+  rdfs:label "requires remedial action"@en ; rdfs:domain biofineu:MonitoringReport ; rdfs:range bfx:RemedialAction .
+bfx:actionStatus a owl:DatatypeProperty ; rdfs:label "action status"@en ; rdfs:comment "open or completed."@en ; rdfs:range xsd:string .
+bfx:completionNotes a owl:DatatypeProperty ; rdfs:label "completion notes"@en ; rdfs:range xsd:string .
+
+# --- sign-offs (who completed or approved each step) ---
+
+bfx:StepSignoff a owl:Class ;
+  rdfs:label "Step sign-off"@en ;
+  rdfs:comment "A BNG step being completed, approved, rejected or edited, and in which role."@en ;
+  rdfs:subClassOf prov:Activity .
+
+bfx:hasSignoff a owl:ObjectProperty ; rdfs:label "has sign-off"@en ; rdfs:range bfx:StepSignoff .
+bfx:decision a owl:DatatypeProperty ;
+  rdfs:label "decision"@en ; rdfs:comment "submitted, approved, rejected or edited."@en ; rdfs:range xsd:string .
+bfx:signedOffAsRole a owl:ObjectProperty ; rdfs:label "signed off as role"@en ; rdfs:range skos:Concept .
+bfx:onBehalf a owl:DatatypeProperty ;
+  rdfs:label "on behalf"@en ; rdfs:comment "Recorded by a project manager on the role's behalf."@en ; rdfs:range xsd:boolean .
+
+# --- answers to the BNG step forms ---
+
+bfx:ConservationCovenant a owl:Class ;
+  rdfs:label "Conservation covenant"@en ;
+  rdfs:comment "The legal agreement securing a habitat bank (conservation covenant or planning obligation)."@en ;
+  rdfs:subClassOf fibo-fnd-agr:Contract .
+
+bfx:hasLegalAgreement a owl:ObjectProperty ; rdfs:label "has legal agreement"@en ; rdfs:range bfx:ConservationCovenant .
+bfx:agreementType a owl:DatatypeProperty ; rdfs:label "agreement type"@en ; rdfs:range xsd:string .
+bfx:responsibleBody a owl:DatatypeProperty ; rdfs:label "responsible body"@en ; rdfs:range xsd:string .
+bfx:managementPeriodYears a owl:DatatypeProperty ;
+  rdfs:label "management period (years)"@en ; rdfs:comment "Length of the habitat management and monitoring plan (at least 30 years)."@en ; rdfs:range xsd:integer .
+
+bfx:StepRecord a owl:Class ;
+  rdfs:label "Step record"@en ;
+  rdfs:comment "The answers given in one BNG step form, as recorded. Answers with a dedicated property (e.g. biofineu:hasReportingFrequency) appear both there and here."@en ;
+  rdfs:subClassOf prov:Entity .
+
+bfx:hasStepRecord a owl:ObjectProperty ; rdfs:label "has step record"@en ; rdfs:range bfx:StepRecord .
+bfx:hasAnswer a owl:ObjectProperty ; rdfs:label "has answer"@en ; rdfs:domain bfx:StepRecord ; rdfs:range bfx:StepAnswer .
+bfx:StepAnswer a owl:Class ;
+  rdfs:label "Step answer"@en ; rdfs:comment "One field of a step record: bfx:fieldName and rdf:value."@en .

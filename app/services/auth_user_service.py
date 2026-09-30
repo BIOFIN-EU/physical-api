@@ -26,7 +26,7 @@ async def resolve_user_id_by_email(email: str) -> UUID:
     if response.status_code == 404:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User with this email does not exist",
+            detail="No account found for this email address. Please ask them to register before assigning access.",
         )
 
     if response.status_code >= 400:

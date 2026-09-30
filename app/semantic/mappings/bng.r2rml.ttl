@@ -1,0 +1,370 @@
+# R2RML: Biodiversity Net Gain (BNG) prototype data of a habitat bank or a
+# development. Tokens as in ./project.r2rml.ttl. Returns nothing for other
+# projects.
+#
+# BNG prices are in GBP (the prototype follows England's BNG scheme).
+# Left out on purpose: user ids (who submitted, verified or signed off),
+# and the personal answers of the Site Registration step (landowner_name,
+# contact_email) - see <#StepAnswer>.
+
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix schema: <https://schema.org/> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix bfx: <{{BASE}}ext#> .
+
+# ---------------------------------------------------------------------
+# Habitat parcels (baseline and proposed habitats) with their units.
+# ---------------------------------------------------------------------
+<#HabitatParcel> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT p.id, p.parcel_name, p.phase, p.category, p.size::text AS size, p.units::text AS units,
+      t.code AS habitat_type, c.code AS condition, s.code AS significance,
+      CASE p.category WHEN 'area' THEN 'http://qudt.org/vocab/unit/HA'
+        ELSE 'http://qudt.org/vocab/unit/KiloM' END AS size_unit
+    FROM case_data.bng_habitat_parcels p
+    LEFT JOIN case_data.bng_habitat_types t ON t.id = p.habitat_type_id
+    LEFT JOIN case_data.bng_conditions c ON c.id = p.condition_id
+    LEFT JOIN case_data.bng_strategic_significance s ON s.id = p.strategic_significance_id
+    WHERE p.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/habitat-parcel/{id}" ; rr:class bfx:HabitatParcel ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "parcel_name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:phase ; rr:objectMap [ rr:column "phase" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatCategory ; rr:objectMap [ rr:column "category" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatType ; rr:objectMap [ rr:template "{{BASE}}concept/bng-habitat-type/{habitat_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatCondition ; rr:objectMap [ rr:template "{{BASE}}concept/bng-condition/{condition}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:strategicSignificance ; rr:objectMap [ rr:template "{{BASE}}concept/bng-strategic-significance/{significance}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:parcelSize ; rr:objectMap [ rr:column "size" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:sizeUnit ; rr:objectMap [ rr:column "size_unit" ; rr:termType rr:IRI ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:biodiversityUnits ; rr:objectMap [ rr:column "units" ; rr:datatype xsd:decimal ] ] .
+
+<#ProjectHabitatParcel> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.bng_habitat_parcels WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasHabitatParcel ; rr:objectMap [ rr:template "{{BASE}}data/habitat-parcel/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Unit allocations: from the development (bfx:hasUnitAllocation) and the
+# habitat bank (bfx:suppliesUnitAllocation). The other project is only
+# referred to by its IRI.
+# ---------------------------------------------------------------------
+<#UnitAllocation> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, status, development_case_id, habitat_bank_case_id,
+      habitat_units::text AS habitat_units, hedgerow_units::text AS hedgerow_units,
+      watercourse_units::text AS watercourse_units,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created,
+      to_char(decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS decided,
+      to_char(allocated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS allocated,
+      to_char(retired_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS retired,
+      to_char(released_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS released
+    FROM case_data.bng_unit_allocations
+    WHERE development_case_id = {{CASE_ID}} OR habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/allocation/{id}" ; rr:class bfx:UnitAllocation ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:allocationStatus ; rr:objectMap [ rr:column "status" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:developmentProject ; rr:objectMap [ rr:template "{{BASE}}data/project/{development_case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatBankProject ; rr:objectMap [ rr:template "{{BASE}}data/project/{habitat_bank_case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatUnits ; rr:objectMap [ rr:column "habitat_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hedgerowUnits ; rr:objectMap [ rr:column "hedgerow_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:watercourseUnits ; rr:objectMap [ rr:column "watercourse_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate prov:generatedAtTime ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:decidedAt ; rr:objectMap [ rr:column "decided" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:allocatedAt ; rr:objectMap [ rr:column "allocated" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:retiredAt ; rr:objectMap [ rr:column "retired" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:releasedAt ; rr:objectMap [ rr:column "released" ; rr:datatype xsd:dateTime ] ] .
+
+<#DevelopmentAllocation> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, development_case_id FROM case_data.bng_unit_allocations WHERE development_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{development_case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasUnitAllocation ; rr:objectMap [ rr:template "{{BASE}}data/allocation/{id}" ] ] .
+
+<#BankAllocation> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, habitat_bank_case_id FROM case_data.bng_unit_allocations WHERE habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{habitat_bank_case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:suppliesUnitAllocation ; rr:objectMap [ rr:template "{{BASE}}data/allocation/{id}" ] ] .
+
+# Prices of an allocation (per unit, snapshotted when requested, and total).
+# kind = the bfx property's local name.
+<#AllocationPriceLink> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT a.id, p.kind
+    FROM case_data.bng_unit_allocations a
+    CROSS JOIN LATERAL (VALUES
+      ('pricePerHabitatUnit', a.price_per_habitat_unit), ('pricePerHedgerowUnit', a.price_per_hedgerow_unit),
+      ('pricePerWatercourseUnit', a.price_per_watercourse_unit), ('totalPrice', a.total_price)
+    ) AS p(kind, amount)
+    WHERE (a.development_case_id = {{CASE_ID}} OR a.habitat_bank_case_id = {{CASE_ID}}) AND p.amount IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/allocation/{id}" ] ;
+  rr:predicateObjectMap [
+    rr:predicateMap [ rr:template "{{BASE}}ext#{kind}" ] ;
+    rr:objectMap [ rr:template "{{BASE}}data/allocation/{id}/{kind}" ]
+  ] .
+
+<#AllocationPrice> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT a.id, p.kind, p.amount::text AS amount
+    FROM case_data.bng_unit_allocations a
+    CROSS JOIN LATERAL (VALUES
+      ('pricePerHabitatUnit', a.price_per_habitat_unit), ('pricePerHedgerowUnit', a.price_per_hedgerow_unit),
+      ('pricePerWatercourseUnit', a.price_per_watercourse_unit), ('totalPrice', a.total_price)
+    ) AS p(kind, amount)
+    WHERE (a.development_case_id = {{CASE_ID}} OR a.habitat_bank_case_id = {{CASE_ID}}) AND p.amount IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/allocation/{id}/{kind}" ; rr:class schema:MonetaryAmount ] ;
+  rr:predicateObjectMap [ rr:predicate schema:value ; rr:objectMap [ rr:column "amount" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate schema:currency ; rr:object "GBP" ] .
+
+# ---------------------------------------------------------------------
+# Transactions (allocated units sold), linked from both projects.
+# ---------------------------------------------------------------------
+<#UnitTransaction> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, reference, allocation_id, development_case_id, habitat_bank_case_id,
+      habitat_units::text AS habitat_units, hedgerow_units::text AS hedgerow_units,
+      watercourse_units::text AS watercourse_units,
+      landowner_share_percent::text AS landowner_share, investor_share_percent::text AS investor_share,
+      manager_share_percent::text AS manager_share,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created
+    FROM case_data.bng_transactions
+    WHERE development_case_id = {{CASE_ID}} OR habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/transaction/{id}" ; rr:class bfx:UnitTransaction ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:transactionReference ; rr:objectMap [ rr:column "reference" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:fromAllocation ; rr:objectMap [ rr:template "{{BASE}}data/allocation/{allocation_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:developmentProject ; rr:objectMap [ rr:template "{{BASE}}data/project/{development_case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatBankProject ; rr:objectMap [ rr:template "{{BASE}}data/project/{habitat_bank_case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatUnits ; rr:objectMap [ rr:column "habitat_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hedgerowUnits ; rr:objectMap [ rr:column "hedgerow_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:watercourseUnits ; rr:objectMap [ rr:column "watercourse_units" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:landownerSharePercent ; rr:objectMap [ rr:column "landowner_share" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:investorSharePercent ; rr:objectMap [ rr:column "investor_share" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:managerSharePercent ; rr:objectMap [ rr:column "manager_share" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:totalPrice ; rr:objectMap [ rr:template "{{BASE}}data/transaction/{id}/totalPrice" ] ] ;
+  rr:predicateObjectMap [ rr:predicate prov:endedAtTime ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] .
+
+<#TransactionPrice> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, total_price::text AS amount FROM case_data.bng_transactions
+    WHERE (development_case_id = {{CASE_ID}} OR habitat_bank_case_id = {{CASE_ID}}) AND total_price IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/transaction/{id}/totalPrice" ; rr:class schema:MonetaryAmount ] ;
+  rr:predicateObjectMap [ rr:predicate schema:value ; rr:objectMap [ rr:column "amount" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate schema:currency ; rr:object "GBP" ] .
+
+<#ProjectTransaction> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, {{CASE_ID}} AS case_id FROM case_data.bng_transactions
+    WHERE development_case_id = {{CASE_ID}} OR habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasTransaction ; rr:objectMap [ rr:template "{{BASE}}data/transaction/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Monitoring (habitat banks): biofineu:MonitoringReport, and remedial
+# actions after a failed report.
+# ---------------------------------------------------------------------
+<#MonitoringReport> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, habitat_bank_case_id, year::text AS year, to_char(due_date, 'YYYY-MM-DD') AS due_date,
+      status, condition_summary, management_carried_out, verification_notes, verified_as,
+      CASE WHEN habitats_on_track IS NULL THEN NULL WHEN habitats_on_track THEN 'true' ELSE 'false' END AS on_track,
+      CASE WHEN submitted_on_behalf THEN 'true' WHEN submitted_on_behalf IS NOT NULL THEN 'false' END AS on_behalf,
+      to_char(submitted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS submitted,
+      to_char(verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS verified
+    FROM case_data.bng_monitoring_reports WHERE habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/monitoring-report/{id}" ; rr:class biofineu:MonitoringReport ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:reportsOn ; rr:objectMap [ rr:template "{{BASE}}data/project/{habitat_bank_case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasReportingDate ; rr:objectMap [ rr:column "submitted" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:monitoringYear ; rr:objectMap [ rr:column "year" ; rr:datatype xsd:integer ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:dueDate ; rr:objectMap [ rr:column "due_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:monitoringStatus ; rr:objectMap [ rr:column "status" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:habitatsOnTrack ; rr:objectMap [ rr:column "on_track" ; rr:datatype xsd:boolean ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:conditionSummary ; rr:objectMap [ rr:column "condition_summary" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:managementCarriedOut ; rr:objectMap [ rr:column "management_carried_out" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:onBehalf ; rr:objectMap [ rr:column "on_behalf" ; rr:datatype xsd:boolean ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:verificationNotes ; rr:objectMap [ rr:column "verification_notes" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:verifiedAt ; rr:objectMap [ rr:column "verified" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:verifiedAsRole ; rr:objectMap [ rr:template "{{BASE}}concept/bng-role/{verified_as}" ] ] .
+
+<#ProjectMonitoringReport> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, habitat_bank_case_id FROM case_data.bng_monitoring_reports WHERE habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{habitat_bank_case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:producesMonitoringReport ; rr:objectMap [ rr:template "{{BASE}}data/monitoring-report/{id}" ] ] .
+
+<#RemedialAction> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT a.id, a.report_id, a.description, a.status, a.completion_notes,
+      to_char(a.due_date, 'YYYY-MM-DD') AS due_date,
+      to_char(a.completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS completed
+    FROM case_data.bng_remedial_actions a
+    JOIN case_data.bng_monitoring_reports r ON r.id = a.report_id
+    WHERE r.habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/remedial-action/{id}" ; rr:class bfx:RemedialAction ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:description ; rr:objectMap [ rr:column "description" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:dueDate ; rr:objectMap [ rr:column "due_date" ; rr:datatype xsd:date ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:actionStatus ; rr:objectMap [ rr:column "status" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:completionNotes ; rr:objectMap [ rr:column "completion_notes" ] ] ;
+  rr:predicateObjectMap [ rr:predicate prov:endedAtTime ; rr:objectMap [ rr:column "completed" ; rr:datatype xsd:dateTime ] ] .
+
+<#ReportRemedialAction> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT a.id, a.report_id
+    FROM case_data.bng_remedial_actions a
+    JOIN case_data.bng_monitoring_reports r ON r.id = a.report_id
+    WHERE r.habitat_bank_case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/monitoring-report/{report_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:requiresRemedialAction ; rr:objectMap [ rr:template "{{BASE}}data/remedial-action/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Sign-offs: who (which role) completed, approved or rejected each step.
+# ---------------------------------------------------------------------
+<#StepSignoff> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, step_code, role, decision, comment,
+      CASE WHEN on_behalf THEN 'true' ELSE 'false' END AS on_behalf,
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created
+    FROM case_data.bng_step_signoffs WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/signoff/{id}" ; rr:class bfx:StepSignoff ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:stepCode ; rr:objectMap [ rr:column "step_code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:decision ; rr:objectMap [ rr:column "decision" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:signedOffAsRole ; rr:objectMap [ rr:template "{{BASE}}concept/bng-role/{role}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:onBehalf ; rr:objectMap [ rr:column "on_behalf" ; rr:datatype xsd:boolean ] ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:comment ; rr:objectMap [ rr:column "comment" ] ] ;
+  rr:predicateObjectMap [ rr:predicate prov:endedAtTime ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] .
+
+<#ProjectSignoff> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.bng_step_signoffs WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasSignoff ; rr:objectMap [ rr:template "{{BASE}}data/signoff/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# BNG step answers. A few have their own property; all of them are also
+# kept as recorded (bfx:StepRecord / bfx:StepAnswer).
+# ---------------------------------------------------------------------
+
+# HMMP step: reporting frequency (base ontology) and management period.
+<#ManagementPlan> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id, NULLIF(data->>'monitoring_frequency', '') AS frequency,
+      CASE WHEN data->>'management_period_years' ~ '^[0-9]+$' THEN data->>'management_period_years' END AS years
+    FROM case_data.bng_step_data WHERE case_id = {{CASE_ID}} AND step_code = 'hmmp'
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasReportingFrequency ; rr:objectMap [ rr:column "frequency" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:managementPeriodYears ; rr:objectMap [ rr:column "years" ; rr:datatype xsd:integer ] ] .
+
+# Legal Security step: the conservation covenant (a FIBO contract).
+<#LegalAgreement> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id, NULLIF(data->>'agreement_type', '') AS agreement_type,
+      NULLIF(data->>'agreement_reference', '') AS reference,
+      NULLIF(data->>'responsible_body', '') AS responsible_body,
+      CASE WHEN data->>'agreement_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN data->>'agreement_date' END AS agreement_date
+    FROM case_data.bng_step_data WHERE case_id = {{CASE_ID}} AND step_code = 'legal_security'
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}/legal-agreement" ; rr:class bfx:ConservationCovenant ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:agreementType ; rr:objectMap [ rr:column "agreement_type" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:identifier ; rr:objectMap [ rr:column "reference" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:responsibleBody ; rr:objectMap [ rr:column "responsible_body" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:date ; rr:objectMap [ rr:column "agreement_date" ; rr:datatype xsd:date ] ] .
+
+<#ProjectLegalAgreement> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id FROM case_data.bng_step_data WHERE case_id = {{CASE_ID}} AND step_code = 'legal_security'
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasLegalAgreement ; rr:objectMap [ rr:template "{{BASE}}data/project/{case_id}/legal-agreement" ] ] .
+
+# Unit Pricing step: the habitat bank's prices per unit (GBP).
+<#UnitPriceLink> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT s.case_id, p.kind
+    FROM case_data.bng_step_data s
+    CROSS JOIN LATERAL (VALUES
+      ('pricePerHabitatUnit', s.data->>'price_per_habitat_unit'),
+      ('pricePerHedgerowUnit', s.data->>'price_per_hedgerow_unit'),
+      ('pricePerWatercourseUnit', s.data->>'price_per_watercourse_unit')
+    ) AS p(kind, amount)
+    WHERE s.case_id = {{CASE_ID}} AND s.step_code = 'unit_pricing' AND p.amount ~ '^[0-9]+(\\.[0-9]+)?$'
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [
+    rr:predicateMap [ rr:template "{{BASE}}ext#{kind}" ] ;
+    rr:objectMap [ rr:template "{{BASE}}data/project/{case_id}/{kind}" ]
+  ] .
+
+<#UnitPrice> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT s.case_id, p.kind, p.amount
+    FROM case_data.bng_step_data s
+    CROSS JOIN LATERAL (VALUES
+      ('pricePerHabitatUnit', s.data->>'price_per_habitat_unit'),
+      ('pricePerHedgerowUnit', s.data->>'price_per_hedgerow_unit'),
+      ('pricePerWatercourseUnit', s.data->>'price_per_watercourse_unit')
+    ) AS p(kind, amount)
+    WHERE s.case_id = {{CASE_ID}} AND s.step_code = 'unit_pricing' AND p.amount ~ '^[0-9]+(\\.[0-9]+)?$'
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}/{kind}" ; rr:class schema:MonetaryAmount ] ;
+  rr:predicateObjectMap [ rr:predicate schema:value ; rr:objectMap [ rr:column "amount" ; rr:datatype xsd:decimal ] ] ;
+  rr:predicateObjectMap [ rr:predicate schema:currency ; rr:object "GBP" ] .
+
+# Every step's answers as recorded.
+<#StepRecord> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id, step_code,
+      to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS modified
+    FROM case_data.bng_step_data WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/step-record/{id}" ; rr:class bfx:StepRecord ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:stepCode ; rr:objectMap [ rr:column "step_code" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:modified ; rr:objectMap [ rr:column "modified" ; rr:datatype xsd:dateTime ] ] .
+
+<#ProjectStepRecord> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.bng_step_data WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasStepRecord ; rr:objectMap [ rr:template "{{BASE}}data/step-record/{id}" ] ] .
+
+# Plain answers only (text, numbers, yes/no); lists and uploaded files are
+# not included. Personal answers are excluded here: add a field name to the
+# NOT IN list to leave another one out.
+<#StepAnswer> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT s.id, e.key, e.value #>> '{}' AS value
+    FROM case_data.bng_step_data s, jsonb_each(s.data) e
+    WHERE s.case_id = {{CASE_ID}}
+      AND e.key NOT IN ('_saved', 'landowner_name', 'contact_email')
+      AND jsonb_typeof(e.value) IN ('string', 'number', 'boolean')
+      AND e.value #>> '{}' <> ''
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/step-record/{id}/answer/{key}" ; rr:class bfx:StepAnswer ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:fieldName ; rr:objectMap [ rr:column "key" ] ] ;
+  rr:predicateObjectMap [ rr:predicate rdf:value ; rr:objectMap [ rr:column "value" ] ] .
+
+<#StepRecordAnswer> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT s.id, e.key
+    FROM case_data.bng_step_data s, jsonb_each(s.data) e
+    WHERE s.case_id = {{CASE_ID}}
+      AND e.key NOT IN ('_saved', 'landowner_name', 'contact_email')
+      AND jsonb_typeof(e.value) IN ('string', 'number', 'boolean')
+      AND e.value #>> '{}' <> ''
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/step-record/{id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasAnswer ; rr:objectMap [ rr:template "{{BASE}}data/step-record/{id}/answer/{key}" ] ] .

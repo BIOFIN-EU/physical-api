@@ -1,0 +1,162 @@
+# R2RML: the project (case), its basic information, its nature-based
+# solution and its sites.
+#
+# {{BASE}}    base IRI (setting SEMANTIC_ENV: dev or prd)
+# {{CASE_ID}} the exported project's id: every query reads that project only
+#
+# Timestamps are formatted in SQL as xsd:dateTime (UTC), numbers are cast
+# to text so their exact value is kept.
+
+@prefix rr: <http://www.w3.org/ns/r2rml#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix bfx: <{{BASE}}ext#> .
+
+# ---------------------------------------------------------------------
+# The project: biofineu:NbSProduct, or for BNG a bfx:HabitatBank (a kind of
+# NbSProduct) or a bfx:Development.
+# ---------------------------------------------------------------------
+<#Project> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT c.id, c.case_type, c.status,
+      CASE c.case_type
+        WHEN 'bng_habitat_bank_v1' THEN '{{BASE}}ext#HabitatBank'
+        WHEN 'bng_development_v1' THEN '{{BASE}}ext#Development'
+        ELSE 'https://w3id.org/biofineu/NbSProduct'
+      END AS class_iri,
+      to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created,
+      to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS modified
+    FROM case_data.cases c
+    WHERE c.id = {{CASE_ID}} AND c.deleted_at IS NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{id}" ] ;
+  rr:predicateObjectMap [ rr:predicate rdf:type ; rr:objectMap [ rr:column "class_iri" ; rr:termType rr:IRI ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:pathway ; rr:objectMap [ rr:template "{{BASE}}concept/pathway/{case_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:workflowStatus ; rr:objectMap [ rr:column "status" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:created ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:modified ; rr:objectMap [ rr:column "modified" ; rr:datatype xsd:dateTime ] ] .
+
+<#ProjectBasicInfo> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT case_id, name, high_level_description
+    FROM case_data.case_basic_info WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:title, rdfs:label ; rr:objectMap [ rr:column "name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:description ; rr:objectMap [ rr:column "high_level_description" ] ] .
+
+# ---------------------------------------------------------------------
+# The nature-based solution (NbS step): biofineu:NbS, classified with
+# concepts from ./vocabularies.r2rml.ttl.
+# ---------------------------------------------------------------------
+<#NbS> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT n.id, n.case_id, n.nbs_description,
+      t.code AS nbs_type, e.code AS environment_type, a.code AS approach_type,
+      i.code AS intervention_type, s.code AS societal_challenge, st.code AS implementation_stage
+    FROM case_data.case_nature_based_solutions n
+    LEFT JOIN case_data.nbs_types t ON t.id = n.nbs_type_id
+    LEFT JOIN case_data.nbs_environment_types e ON e.id = n.nbs_environment_type_id
+    LEFT JOIN case_data.nbs_approach_types a ON a.id = n.nbs_approach_type_id
+    LEFT JOIN case_data.nbs_intervention_types i ON i.id = n.nbs_intervention_type_id
+    LEFT JOIN case_data.nbs_societal_challenge_types s ON s.id = n.nbs_societal_challenge_type_id
+    LEFT JOIN case_data.implementation_stages st ON st.id = n.implementation_stage_id
+    WHERE n.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/nbs/{id}" ; rr:class biofineu:NbS ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:containsNbSProduct ; rr:objectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate dcterms:description ; rr:objectMap [ rr:column "nbs_description" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasNbSType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-type/{nbs_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasEnvironmentType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-environment-type/{environment_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasApproachType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-approach-type/{approach_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasInterventionType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-intervention-type/{intervention_type}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:addressesSocietalChallenge ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-societal-challenge/{societal_challenge}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasImplementationStage ; rr:objectMap [ rr:template "{{BASE}}concept/implementation-stage/{implementation_stage}" ] ] .
+
+# The project is contained in its NbS (inverse of biofineu:containsNbSProduct).
+<#ProjectNbS> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id FROM case_data.case_nature_based_solutions WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:isContainedInNbS ; rr:objectMap [ rr:template "{{BASE}}data/nbs/{id}" ] ] .
+
+# ---------------------------------------------------------------------
+# Sites (Location step): a bfx:Site (geo:Feature) with a GeoSPARQL geometry.
+# Stored WKT is longitude/latitude (CRS84, the GeoSPARQL default).
+# ---------------------------------------------------------------------
+<#Site> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT l.id, l.case_id, l.friendly_name, l.notes, l.location_type,
+      l.area_sqm::text AS area_sqm, c.code AS country
+    FROM case_data.case_locations l
+    LEFT JOIN case_data.countries c ON c.id = l.country_id
+    WHERE l.case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/site/{id}" ; rr:class bfx:Site ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:label ; rr:objectMap [ rr:column "friendly_name" ] ] ;
+  rr:predicateObjectMap [ rr:predicate rdfs:comment ; rr:objectMap [ rr:column "notes" ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:locationType ; rr:objectMap [ rr:column "location_type" ] ] ;
+  rr:predicateObjectMap [ rr:predicate geo:hasMetricArea ; rr:objectMap [ rr:column "area_sqm" ; rr:datatype xsd:double ] ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:country ; rr:objectMap [ rr:template "{{BASE}}concept/country/{country}" ] ] ;
+  rr:predicateObjectMap [ rr:predicate geo:hasGeometry ; rr:objectMap [ rr:template "{{BASE}}data/site/{id}/geometry" ] ] .
+
+<#SiteGeometry> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, COALESCE(geometry_wkt,
+      CASE WHEN longitude IS NOT NULL AND latitude IS NOT NULL
+        THEN 'POINT(' || longitude::text || ' ' || latitude::text || ')' END) AS wkt
+    FROM case_data.case_locations WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/site/{id}/geometry" ; rr:class geo:Geometry ] ;
+  rr:predicateObjectMap [ rr:predicate geo:asWKT ; rr:objectMap [ rr:column "wkt" ; rr:datatype geo:wktLiteral ] ] .
+
+<#ProjectSite> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, case_id FROM case_data.case_locations WHERE case_id = {{CASE_ID}}
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
+  rr:predicateObjectMap [ rr:predicate bfx:hasSite ; rr:objectMap [ rr:template "{{BASE}}data/site/{id}" ] ] .
+
+# The NbS is in the NUTS level-0 region of each of its sites' countries
+# (NUTS 0 = country code, except Greece = EL). Only countries that have NUTS
+# codes are listed.
+<#NbSRegion> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT DISTINCT n.id, CASE c.code WHEN 'GR' THEN 'EL' ELSE c.code END AS nuts
+    FROM case_data.case_nature_based_solutions n
+    JOIN case_data.case_locations l ON l.case_id = n.case_id
+    JOIN case_data.countries c ON c.id = l.country_id
+    WHERE n.case_id = {{CASE_ID}} AND c.code IN (
+      'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU','IE','IT','LT','LU',
+      'LV','MT','NL','PL','PT','RO','SE','SI','SK',
+      'CH','IS','LI','NO',
+      'AL','ME','MK','RS')
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/nbs/{id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:locatedInNUTSRegion ; rr:objectMap [ rr:template "http://data.europa.eu/nuts/code/{nuts}" ] ] .
+
+# ---------------------------------------------------------------------
+# Risk: each site's risk score in the risk framework. Only the link is
+# exported here; the score itself is kept by the risk framework service.
+# ---------------------------------------------------------------------
+<#NbSRiskProfile> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT DISTINCT n.id, l.risk_id
+    FROM case_data.case_nature_based_solutions n
+    JOIN case_data.case_locations l ON l.case_id = n.case_id
+    WHERE n.case_id = {{CASE_ID}} AND l.risk_id IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/nbs/{id}" ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:hasRiskProfile ; rr:objectMap [ rr:template "{{BASE}}data/risk-score/{risk_id}" ] ] .
+
+<#RiskScore> a rr:TriplesMap ;
+  rr:logicalTable [ rr:sqlQuery """
+    SELECT id, risk_id FROM case_data.case_locations WHERE case_id = {{CASE_ID}} AND risk_id IS NOT NULL
+  """ ] ;
+  rr:subjectMap [ rr:template "{{BASE}}data/risk-score/{risk_id}" ; rr:class biofineu:RiskScore ] ;
+  rr:predicateObjectMap [ rr:predicate biofineu:calculatedForRegion ; rr:objectMap [ rr:template "{{BASE}}data/site/{id}/geometry" ] ] .
