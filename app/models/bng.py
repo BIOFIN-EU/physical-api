@@ -34,6 +34,12 @@ from app.models.case_data import CASE_DATA_SCHEMA
 from app.models.mixins import ActorStampMixin
 
 BNG_CATEGORIES = ("area", "hedgerow", "watercourse")
+# How each category is shown: its name, the unit its size is measured in
+# (area habitats in hectares, hedgerows and watercourses in km) and the name
+# of its biodiversity units.
+BNG_CATEGORY_LABELS = {"area": "Area habitats", "hedgerow": "Hedgerows", "watercourse": "Watercourses"}
+BNG_SIZE_UNITS = {"area": "ha", "hedgerow": "km", "watercourse": "km"}
+BNG_UNIT_NAMES = {"area": "habitat units", "hedgerow": "hedgerow units", "watercourse": "watercourse units"}
 BNG_PHASES = ("baseline", "proposed")
 
 # Workflow codes (app/workflow_configs/workflows.json)
@@ -51,6 +57,7 @@ BNG_PRICING_STEP = "unit_pricing"
 #   -> retired (gain plan approved; a transaction record is created).
 #   declined (bank) and released (developer) free the units again.
 ALLOCATION_STATUSES = ("requested", "reserved", "allocated", "retired", "declined", "released")
+ALLOCATION_STATUS_LABELS = {status: status.capitalize() for status in ALLOCATION_STATUSES}
 # Statuses that hold a habitat bank's units.
 ACTIVE_ALLOCATION_STATUSES = ("requested", "reserved", "allocated", "retired")
 # Accepted by the habitat bank: counted as secured for the development.
@@ -77,14 +84,31 @@ BNG_CREATOR_ROLE = {
 
 # How a step was signed off (bng_step_signoffs.decision).
 SIGNOFF_DECISIONS = ("submitted", "approved", "rejected", "edited")
+SIGNOFF_DECISION_LABELS = {"submitted": "Completed", "approved": "Approved", "rejected": "Rejected", "edited": "Edited"}
 
 # Monitoring (diagram steps 27-32): reports due this many years after the
 # habitat bank is registered.
 MONITORING_YEARS = (1, 2, 5, 10, 15, 20, 25, 30)
 MONITORING_STATUSES = ("due", "submitted", "passed", "failed", "remediated")
+MONITORING_STATUS_LABELS = {
+    "due": "Due",
+    "submitted": "Awaiting verification",
+    "passed": "Passed",
+    "failed": "Failed",
+    "remediated": "Remediated",
+}
 REMEDIAL_STATUSES = ("open", "completed")
-# Roles that verify monitoring reports.
+# Roles that verify monitoring reports, and that submit them (and complete
+# remedial actions) for the habitat bank.
 VERIFIER_ROLES = ("ecologist", "lpa")
+MONITORING_BANK_ROLES = ("landowner",)
+
+# BNG roles that decide on a unit allocation request, per side: the habitat
+# bank accepts or declines it, the development releases it.
+ALLOCATION_DECIDING_ROLES = {
+    "habitat_bank": ("landowner", "investor"),
+    "development": ("developer",),
+}
 
 # Revenue split (unit_pricing step): share of each transaction per party.
 REVENUE_SHARE_FIELDS = {
@@ -92,6 +116,7 @@ REVENUE_SHARE_FIELDS = {
     "investor": "investor_share_percent",
     "manager": "manager_share_percent",
 }
+REVENUE_PARTY_LABELS = {"landowner": "Landowner", "investor": "Investor", "manager": "Habitat manager"}
 
 _CATEGORY_CHECK = "category IN ('area', 'hedgerow', 'watercourse')"
 
