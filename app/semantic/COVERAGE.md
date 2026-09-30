@@ -76,7 +76,7 @@ rows (`deleted_at`) are not exported.
 | `bng_step_data` answers that are lists or files (e.g. `bng_documents`) | – | Out (not plain values) |
 | `bng_case_roles` | – | Out (which user holds which role; the roles appear on sign-offs) |
 
-## Code lists (`mappings/vocabularies.r2rml.ttl`, `data/concept-schemes.ttl`)
+## Code lists (`mappings/vocabularies.r2rml.ttl`, `concepts/concept-schemes.ttl`)
 
 Each becomes a `skos:ConceptScheme` `concept/{scheme}` with a `skos:Concept` per row
 (`skos:prefLabel` = name, `skos:definition` = description, `skos:notation` = code):
@@ -87,7 +87,7 @@ Each becomes a `skos:ConceptScheme` `concept/{scheme}` with a `skos:Concept` per
 (+ category, distinctiveness), `bng_conditions` and `bng_strategic_significance`
 (+ `bfx:multiplier`), `currencies` (`skos:exactMatch` EU currency list), `countries`
 (`skos:exactMatch` EU country list), `workflow.workflow_definitions` (pathways). BNG
-roles come from `data/concept-schemes.ttl`, each with `bfx:roleClass`
+roles come from `concepts/concept-schemes.ttl`, each with `bfx:roleClass`
 (`biofineu:LandOwnerRole`, `biofineu:FunderRole`, `biofineu:LocalGovernmentRole`,
 `bfx:DeveloperRole`, `bfx:EcologistRole`).
 

@@ -1,7 +1,7 @@
 # R2RML: lookup tables as SKOS concept schemes (one scheme per table).
 # {{BASE}} is replaced by the base IRI (setting SEMANTIC_ENV). Concepts are
 # {{BASE}}concept/<scheme>/<code>; the schemes themselves are described in
-# ../data/concept-schemes.ttl. Every concept is exported; the JSON-LD
+# ../concepts/concept-schemes.ttl. Every concept is exported; the JSON-LD
 # document only keeps the ones a project refers to.
 
 @prefix rr: <http://www.w3.org/ns/r2rml#> .

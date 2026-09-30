@@ -8,7 +8,7 @@ How it works:
    Their placeholders are filled in: {{BASE}} (the base IRI, from
    SEMANTIC_ENV) and {{CASE_ID}} (so every query reads one project only).
 2. Morph-KGC (an R2RML processor) runs them against the database, giving an
-   RDF graph; data/concept-schemes.ttl is added to it.
+   RDF graph; concepts/concept-schemes.ttl is added to it.
 3. The graph is framed as JSON-LD: one document, the project at the top,
    with what it refers to nested inside. Nodes it doesn't refer to (e.g.
    unused concepts) are dropped.
@@ -39,7 +39,7 @@ from app.core.settings import settings
 HERE = Path(__file__).parent
 MAPPINGS = HERE / "mappings"
 EXTENSION_ONTOLOGY = HERE / "ontology" / "biofin-ext.ttl"
-STATIC_DATA = HERE / "data" / "concept-schemes.ttl"
+STATIC_DATA = HERE / "concepts" / "concept-schemes.ttl"
 CONTEXT_FILE = HERE / "context.jsonld"
 
 BASE_TOKEN = "{{BASE}}"

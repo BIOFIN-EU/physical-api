@@ -50,7 +50,7 @@ def _shacl(graph: Graph) -> None:
 # ---------- the files themselves ----------
 
 def test_every_file_parses():
-    for path in [*HERE.glob("mappings/*.ttl"), *HERE.glob("ontology/*.ttl"), *HERE.glob("data/*.ttl"), *HERE.glob("shapes/*.ttl")]:
+    for path in [*HERE.glob("mappings/*.ttl"), *HERE.glob("ontology/*.ttl"), *HERE.glob("concepts/*.ttl"), *HERE.glob("shapes/*.ttl")]:
         Graph().parse(data=service.render(path.read_text(), case_id=1), format="turtle")
     json.loads(service.render((HERE / "context.jsonld").read_text()))
 
@@ -62,7 +62,7 @@ def test_every_extension_term_used_is_declared():
         if str(s).startswith(str(bfx()))
     }
     used = set()
-    for path in [*HERE.glob("mappings/*.ttl"), *HERE.glob("data/*.ttl"), *HERE.glob("shapes/*.ttl")]:
+    for path in [*HERE.glob("mappings/*.ttl"), *HERE.glob("concepts/*.ttl"), *HERE.glob("shapes/*.ttl")]:
         content = path.read_text()
         used |= set(re.findall(r"\bbfx:(\w+)", content))
         used |= set(re.findall(r"\{\{BASE\}\}ext#(\w+)", content))

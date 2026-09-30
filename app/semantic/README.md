@@ -24,7 +24,7 @@ Postgres ──R2RML mappings──► RDF graph ──frame (context.jsonld)─
 |---|---|---|
 | `mappings/*.r2rml.ttl` | R2RML rules, one file per area: `project` (project, NbS, sites, risk links), `finance`, `parties` (operators, intermediaries, documents), `bng`, `vocabularies` (lookup tables as SKOS concept schemes) | map a new column or table, or change which term a column maps to |
 | `ontology/biofin-ext.ttl` | The extension ontology (`bfx:`): every term the mappings use that the base ontology lacks, each linked to the base ontology or a standard vocabulary | add or document an extension term; terms marked *Candidate for biofineu* could move into the base ontology |
-| `data/concept-schemes.ttl` | Names of the concept schemes, and the BNG roles (defined in code, not a table) with the role class each corresponds to | add a scheme or a role |
+| `concepts/concept-schemes.ttl` | Names of the concept schemes, and the BNG roles (defined in code, not a table) with the role class each corresponds to | add a scheme or a role |
 | `context.jsonld` | JSON-LD context: the prefixes used in the document | add a prefix for a new vocabulary |
 | `shapes/export-shapes.ttl` | SHACL shapes the export must satisfy (checked by the tests) | add a rule for a new mapping |
 | `service.py` | Fills in the placeholders, runs the mappings, frames the result | change how the document is built |

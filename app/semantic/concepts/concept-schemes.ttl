@@ -1,0 +1,91 @@
+# Concept schemes of the export's code lists (the concepts themselves come
+# from the lookup tables, see ../mappings/vocabularies.r2rml.ttl), and the
+# BNG roles, which are defined in code (app/models/bng.py) rather than in a
+# table. {{BASE}} is replaced as in the mappings.
+
+@prefix bfx: <{{BASE}}ext#> .
+@prefix biofineu: <https://w3id.org/biofineu/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+<{{BASE}}concept/nbs-type> a skos:ConceptScheme ;
+  skos:prefLabel "NbS types"@en .
+
+<{{BASE}}concept/nbs-environment-type> a skos:ConceptScheme ;
+  skos:prefLabel "NbS environment types (EU MAES ecosystem types)"@en .
+
+<{{BASE}}concept/nbs-approach-type> a skos:ConceptScheme ;
+  skos:prefLabel "NbS approach types (IUCN families of NbS approaches)"@en .
+
+<{{BASE}}concept/nbs-intervention-type> a skos:ConceptScheme ;
+  skos:prefLabel "NbS intervention types (Type 1 protection, Type 2 management, Type 3 restoration and creation)"@en .
+
+<{{BASE}}concept/nbs-societal-challenge> a skos:ConceptScheme ;
+  skos:prefLabel "Societal challenges addressed by NbS"@en .
+
+<{{BASE}}concept/implementation-stage> a skos:ConceptScheme ;
+  skos:prefLabel "Implementation stages"@en .
+
+<{{BASE}}concept/financing-type> a skos:ConceptScheme ;
+  skos:prefLabel "Financing types"@en .
+
+<{{BASE}}concept/use-of-proceeds> a skos:ConceptScheme ;
+  skos:prefLabel "Uses of proceeds"@en .
+
+<{{BASE}}concept/operator-specialty> a skos:ConceptScheme ;
+  skos:prefLabel "Operator specialties"@en .
+
+<{{BASE}}concept/intermediary-function> a skos:ConceptScheme ;
+  skos:prefLabel "Intermediary functions"@en .
+
+<{{BASE}}concept/currency> a skos:ConceptScheme ;
+  skos:prefLabel "Currencies (ISO 4217)"@en .
+
+<{{BASE}}concept/country> a skos:ConceptScheme ;
+  skos:prefLabel "Countries (ISO 3166-1 alpha-2)"@en .
+
+<{{BASE}}concept/pathway> a skos:ConceptScheme ;
+  skos:prefLabel "Dashboard pathways (workflows)"@en .
+
+<{{BASE}}concept/bng-habitat-type> a skos:ConceptScheme ;
+  skos:prefLabel "BNG habitat types"@en .
+
+<{{BASE}}concept/bng-condition> a skos:ConceptScheme ;
+  skos:prefLabel "BNG habitat conditions"@en .
+
+<{{BASE}}concept/bng-strategic-significance> a skos:ConceptScheme ;
+  skos:prefLabel "BNG strategic significance"@en .
+
+<{{BASE}}concept/bng-role> a skos:ConceptScheme ;
+  skos:prefLabel "BNG roles"@en .
+
+# BNG roles, each linked to the role class it corresponds to.
+
+<{{BASE}}concept/bng-role/landowner> a skos:Concept ;
+  skos:prefLabel "Landowner / Habitat Bank"@en ;
+  skos:notation "landowner" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass biofineu:LandOwnerRole .
+
+<{{BASE}}concept/bng-role/investor> a skos:Concept ;
+  skos:prefLabel "Investor"@en ;
+  skos:notation "investor" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass biofineu:FunderRole .
+
+<{{BASE}}concept/bng-role/developer> a skos:Concept ;
+  skos:prefLabel "Developer"@en ;
+  skos:notation "developer" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass bfx:DeveloperRole .
+
+<{{BASE}}concept/bng-role/ecologist> a skos:Concept ;
+  skos:prefLabel "Ecologist"@en ;
+  skos:notation "ecologist" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass bfx:EcologistRole .
+
+<{{BASE}}concept/bng-role/lpa> a skos:Concept ;
+  skos:prefLabel "Local Planning Authority"@en ;
+  skos:notation "lpa" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass biofineu:LocalGovernmentRole .
