@@ -16,10 +16,20 @@ from sqlalchemy.orm import selectinload
 from app.models.bng import (
     ACCEPTED_ALLOCATION_STATUSES,
     ACTIVE_ALLOCATION_STATUSES,
+    ALLOCATION_STATUS_LABELS,
+    LOCKED_ALLOCATION_STATUSES,
     BNG_ALLOCATION_STEP,
     BNG_CATEGORIES,
+    BNG_CATEGORY_LABELS,
     BNG_HABITAT_BANK_WORKFLOW,
     BNG_PRICING_STEP,
+    BNG_ROLE_LABELS,
+    BNG_ROLES,
+    BNG_SIZE_UNITS,
+    BNG_UNIT_NAMES,
+    MONITORING_STATUS_LABELS,
+    REVENUE_PARTY_LABELS,
+    SIGNOFF_DECISION_LABELS,
     BngCondition,
     BngHabitatParcel,
     BngHabitatType,
@@ -88,6 +98,8 @@ def _serialize_allocation(allocation: BngUnitAllocation, names: dict[int, str | 
     return {
         "id": allocation.id,
         "status": allocation.status,
+        # Allocated and retired units can no longer be changed or released.
+        "locked": allocation.status in LOCKED_ALLOCATION_STATUSES,
         "development_case_id": allocation.development_case_id,
         "development_name": names.get(allocation.development_case_id),
         "habitat_bank_case_id": allocation.habitat_bank_case_id,
@@ -368,6 +380,26 @@ async def available_habitat_banks(db: AsyncSession) -> list[dict[str, Any]]:
     return listed
 
 
+def vocabulary() -> dict[str, Any]:
+    """How BNG codes are shown, so the frontend keeps no copy of them."""
+    return {
+        "roles": [{"code": role, "label": BNG_ROLE_LABELS[role]} for role in BNG_ROLES],
+        "categories": [
+            {
+                "code": category,
+                "label": BNG_CATEGORY_LABELS[category],
+                "size_unit": BNG_SIZE_UNITS[category],
+                "unit_name": BNG_UNIT_NAMES[category],
+            }
+            for category in BNG_CATEGORIES
+        ],
+        "allocation_statuses": ALLOCATION_STATUS_LABELS,
+        "monitoring_statuses": MONITORING_STATUS_LABELS,
+        "revenue_parties": REVENUE_PARTY_LABELS,
+        "signoff_decisions": SIGNOFF_DECISION_LABELS,
+    }
+
+
 async def reference_data(db: AsyncSession) -> dict[str, Any]:
     habitat_types = (await db.execute(select(BngHabitatType).order_by(BngHabitatType.category, BngHabitatType.name))).scalars()
     conditions = (await db.execute(select(BngCondition).order_by(BngCondition.multiplier))).scalars()
@@ -392,4 +424,5 @@ async def reference_data(db: AsyncSession) -> dict[str, Any]:
             {"id": row.id, "name": row.name, "multiplier": float(row.multiplier), "description": row.description}
             for row in significance
         ],
+        "vocabulary": vocabulary(),
     }

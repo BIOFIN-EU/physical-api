@@ -10,10 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.dependencies.case_access import require_case_permission
 from app.dependencies.gateway_identity import get_request_user_id
-from app.models.bng import BNG_HABITAT_BANK_WORKFLOW, BNG_ROLE_LABELS, BNG_ROLES, BNG_WORKFLOWS
+from app.models.bng import (
+    BNG_DEVELOPMENT_WORKFLOW,
+    BNG_HABITAT_BANK_WORKFLOW,
+    BNG_ROLE_LABELS,
+    BNG_ROLES,
+    BNG_WORKFLOWS,
+)
 from app.models.case_data import Case, CaseUserAccess
 from app.schemas.bng import HabitatParcelsPreview
 from app.schemas.bng_requests import (
+    AllocationSuggestionsRequest,
     BngRolesUpdate,
     MonitoringReportSubmit,
     MonitoringReportVerify,
@@ -21,6 +28,13 @@ from app.schemas.bng_requests import (
     RemedialActionComplete,
 )
 from app.services.bng_marketplace import apply_allocation_action
+from app.services.bng_matching import (
+    allocation_options,
+    allocation_suggestions,
+    marketplace,
+    user_developments,
+)
+from app.services.case_user_access_service import get_case_user_access
 from app.services.bng_monitoring import (
     bank_reports,
     complete_remedial_action,
@@ -29,13 +43,21 @@ from app.services.bng_monitoring import (
     verify_report,
 )
 from app.services.workflow_config_service import WorkflowConfigService
-from app.services.bng_roles import case_roles, case_signoffs, set_user_roles, user_roles, waiting_for_user
+from app.services.bng_roles import (
+    case_roles,
+    case_signoffs,
+    my_capacities,
+    set_user_roles,
+    user_roles,
+    waiting_for_user,
+)
 from app.services.bng_payload import (
     available_habitat_banks,
     bank_finances,
     case_allocations,
     case_metric,
     case_transactions,
+    _role,
     case_name,
     reference_data,
 )
@@ -69,6 +91,59 @@ async def list_habitat_banks(
     available, their prices and sites.
     """
     return await available_habitat_banks(db)
+
+
+async def _development_or_404(db: AsyncSession, case_id: int) -> Case:
+    case = await _bng_case_or_404(db, case_id)
+    if case.case_type != BNG_DEVELOPMENT_WORKFLOW:
+        raise HTTPException(status_code=404, detail="Not a BNG development")
+    return case
+
+
+@router.get("/marketplace")
+async def get_marketplace(
+    development_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_request_user_id),
+) -> dict[str, Any]:
+    """
+    The inventory, the user's developments (to choose from) and, for the
+    chosen development, its remaining need and how well each bank covers it.
+    A development_id that isn't one of the user's developments is ignored
+    (development is null), as for an old or shared link.
+    """
+    development = None
+    if development_id is not None:
+        access = await get_case_user_access(db, case_id=development_id, user_id=user_id)
+        case = await db.get(Case, development_id) if access is not None and access.can_view else None
+        if case is not None and case.case_type == BNG_DEVELOPMENT_WORKFLOW and case.deleted_at is None:
+            development = case
+    result = await marketplace(db, development)
+    result["developments"] = await user_developments(db, user_id)
+    return result
+
+
+@router.get("/cases/{case_id}/allocation-options")
+async def get_allocation_options(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
+) -> dict[str, Any]:
+    """For the reservation step: the units needed and the banks to reserve from."""
+    return await allocation_options(db, await _development_or_404(db, case_id))
+
+
+@router.post("/cases/{case_id}/allocation-suggestions")
+async def post_allocation_suggestions(
+    case_id: int,
+    body: AllocationSuggestionsRequest,
+    db: AsyncSession = Depends(get_db),
+    access: CaseUserAccess = Depends(require_case_permission("can_view")),
+) -> list[dict[str, Any]]:
+    """Banks ranked by how much of the still-needed units they cover (best first)."""
+    return await allocation_suggestions(
+        db, await _development_or_404(db, case_id), body.need, body.exclude_bank_ids
+    )
 
 
 @router.get("/cases/{case_id}/metric")
@@ -185,12 +260,16 @@ async def get_my_access(
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> dict[str, Any]:
-    """The current user's BNG roles, and whether they can act on behalf of others."""
-    await _bng_case_or_404(db, case_id)
+    """
+    The current user's BNG roles, whether they can act on behalf of others,
+    and what that lets them do on this project (capacities).
+    """
+    case = await _bng_case_or_404(db, case_id)
     return {
         "roles": sorted(await user_roles(db, case_id, access.user_id)),
         "can_update": access.can_update,
         "can_record_on_behalf": access.can_assign_users,
+        "capacities": await my_capacities(db, case, access),
     }
 
 
@@ -309,6 +388,7 @@ async def get_case_report(
     report: dict[str, Any] = {
         "case_id": case.id,
         "case_type": case.case_type,
+        "role": _role(case.case_type),
         "name": await case_name(db, case.id),
         "metric": await case_metric(db, case),
         "allocations": await case_allocations(db, case),

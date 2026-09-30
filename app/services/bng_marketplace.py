@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.bng import BngUnitAllocation
+from app.models.bng import ALLOCATION_DECIDING_ROLES, BngUnitAllocation
 from app.models.case_data import Case
 from app.services.bng_roles import act_as
 from app.services.case_user_access_service import get_case_user_access
@@ -22,11 +22,6 @@ ACTIONS = {
     "accept": ("habitat_bank", ("requested",), "reserved"),
     "decline": ("habitat_bank", ("requested",), "declined"),
     "release": ("development", ("requested", "reserved"), "released"),
-}
-# BNG roles that decide, per side (a project manager can act on their behalf).
-DECIDING_ROLES = {
-    "habitat_bank": ("landowner", "investor"),
-    "development": ("developer",),
 }
 
 
@@ -53,7 +48,7 @@ async def apply_allocation_action(
     await act_as(
         db,
         access=access,
-        roles=DECIDING_ROLES[side],
+        roles=ALLOCATION_DECIDING_ROLES[side],
         on_behalf_requested=on_behalf,
         action=f"{action} this request",
     )

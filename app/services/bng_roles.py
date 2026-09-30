@@ -19,7 +19,11 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bng import (
+    ALLOCATION_DECIDING_ROLES,
     BNG_CREATOR_ROLE,
+    BNG_HABITAT_BANK_WORKFLOW,
+    MONITORING_BANK_ROLES,
+    VERIFIER_ROLES,
     BNG_ROLE_LABELS,
     BNG_ROLES,
     BNG_WORKFLOWS,
@@ -122,6 +126,57 @@ def add_creator_role(db: AsyncSession, *, case_id: int, workflow_code: str, user
 # Acting in a role
 # ---------------------------------------------------------
 
+def capacity_for(
+    held: Iterable[str],
+    roles: Iterable[str],
+    *,
+    can_record_on_behalf: bool,
+    allow_on_behalf: bool = True,
+) -> dict[str, Any]:
+    """
+    How a user holding `held` may act for something owned by `roles`:
+    {"kind": "own" | "on_behalf" | "none", "role": ..., "roles": [...]}.
+    "on_behalf" is for a project manager, who must confirm it each time.
+    """
+    held, roles = set(held), list(roles)
+    own = [role for role in roles if role in held]
+    if own:
+        return {"kind": "own", "role": own[0], "roles": roles}
+    first = roles[0] if roles else None
+    if allow_on_behalf and can_record_on_behalf:
+        return {"kind": "on_behalf", "role": first, "roles": roles}
+    return {"kind": "none", "role": first, "roles": roles}
+
+
+async def my_capacities(db: AsyncSession, case: Case, access: CaseUserAccess) -> dict[str, Any]:
+    """
+    What the user may do on a BNG project, for the frontend to show the right
+    controls (each action is still checked with act_as when it is done):
+    each step with roles, deciding on unit allocation requests, and (habitat
+    banks only) submitting and verifying monitoring reports.
+    """
+    # Imported here: case_state imports this module (via bng_payload).
+    from app.services.case_state import get_case_workflow_config
+
+    held = await user_roles(db, case.id, access.user_id)
+    on_behalf = bool(access.can_assign_users)
+    workflow_config = await get_case_workflow_config(db, case.id) or {}
+    steps = {
+        code: capacity_for(held, step["roles"], can_record_on_behalf=on_behalf,
+                           allow_on_behalf=bool(step.get("allow_on_behalf")))
+        for code, step in (workflow_config.get("steps") or {}).items()
+        if step.get("roles")
+    }
+    is_bank = case.case_type == BNG_HABITAT_BANK_WORKFLOW
+    side = "habitat_bank" if is_bank else "development"
+    return {
+        "steps": steps,
+        "allocations": capacity_for(held, ALLOCATION_DECIDING_ROLES[side], can_record_on_behalf=on_behalf),
+        "monitoring_submit": capacity_for(held, MONITORING_BANK_ROLES, can_record_on_behalf=on_behalf) if is_bank else None,
+        "monitoring_verify": capacity_for(held, VERIFIER_ROLES, can_record_on_behalf=on_behalf) if is_bank else None,
+    }
+
+
 async def act_as(
     db: AsyncSession,
     *,
@@ -138,11 +193,12 @@ async def act_as(
     """
     roles = list(roles)
     mine = await user_roles(db, access.case_id, access.user_id)
-    own = [role for role in roles if role in mine]
-    if own:
-        return {"role": own[0], "on_behalf": False}
+    capacity = capacity_for(mine, roles, can_record_on_behalf=bool(access.can_assign_users),
+                            allow_on_behalf=allow_on_behalf)
+    if capacity["kind"] == "own":
+        return {"role": capacity["role"], "on_behalf": False}
 
-    if allow_on_behalf and access.can_assign_users:
+    if capacity["kind"] == "on_behalf":
         if on_behalf_requested:
             return {"role": roles[0], "on_behalf": True}
         raise HTTPException(

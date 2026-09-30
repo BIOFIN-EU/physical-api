@@ -24,6 +24,7 @@ from sqlalchemy.orm import selectinload
 from app.models.bng import (
     BNG_HABITAT_BANK_WORKFLOW,
     BNG_ROLE_LABELS,
+    MONITORING_BANK_ROLES,
     MONITORING_YEARS,
     VERIFIER_ROLES,
     BngMonitoringReport,
@@ -37,7 +38,7 @@ from app.services.bng_roles import act_as
 from app.services.case_user_access_service import get_case_user_access
 
 REGISTER_STEP = "gain_site_register"
-BANK_ROLES = ("landowner",)
+BANK_ROLES = MONITORING_BANK_ROLES
 
 
 def _add_years(start: date, years: int) -> date:

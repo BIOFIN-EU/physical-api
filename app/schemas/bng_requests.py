@@ -38,3 +38,10 @@ class MonitoringReportVerify(OnBehalfRequest):
 
 class RemedialActionComplete(OnBehalfRequest):
     completion_notes: str = Field(min_length=1, max_length=4000)
+
+
+class AllocationSuggestionsRequest(BaseModel):
+    # The units still needed after the rows in the form, per category.
+    need: dict[Literal["area", "hedgerow", "watercourse"], float] = Field(default_factory=dict)
+    # Banks already in the form, which are not suggested again.
+    exclude_bank_ids: list[int] = Field(default_factory=list, max_length=200)
