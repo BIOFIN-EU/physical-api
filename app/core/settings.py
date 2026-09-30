@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     AUTH_CLIENT_ID: str = "api_physical"
     AUTH_CLIENT_SECRET: str
 
+    #todo fix this
     # JSON-LD export (app/semantic): IRIs are https://ontology.<env>.biofindashboard.eu/...
     SEMANTIC_ENV: Literal["dev", "prd"] = "dev"
 
