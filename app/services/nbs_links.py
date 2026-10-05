@@ -23,6 +23,15 @@ from app.models.case_data import (
 )
 
 
+# Headings of the intervention types (D2.2 Table 4, after Eggermont et al.
+# 2015), sent with each intervention so lists can be grouped by type.
+INTERVENTION_TYPE_LABELS = {
+    "type_1": "Type 1 – Better use of protected and natural ecosystems",
+    "type_2": "Type 2 – Sustainability and multifunctionality of managed or restored ecosystems",
+    "type_3": "Type 3 – Design and management of new ecosystems",
+}
+
+
 def _intervention_matches_all(intervention_id: int) -> ColumnElement[bool]:
     flag = select(NbSInterventionType.matches_all).where(NbSInterventionType.id == intervention_id)
     return flag.scalar_subquery().is_(True)
