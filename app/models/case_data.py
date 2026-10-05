@@ -527,21 +527,6 @@ class CaseFinancingType(ActorStampMixin, Base):
 
 
 # ---------------------------------------------------------
-# 4. NBS Type lookup
-# ---------------------------------------------------------
-
-class NBSType(Base):
-    __tablename__ = "nbs_types"
-    __table_args__ = {"schema": CASE_DATA_SCHEMA}
-
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=True)
-
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-
-# ---------------------------------------------------------
 # 5. Implementation Stage lookup
 # ---------------------------------------------------------
 
@@ -573,12 +558,6 @@ class CaseNatureBasedSolution(ActorStampMixin, Base):
         ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
         nullable=False,
     )
-
-    nbs_type_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_types.id"),
-        nullable=False,
-    )
-    nbs_type: Mapped["NBSType"] = relationship()
 
     implementation_stage_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey(f"{CASE_DATA_SCHEMA}.implementation_stages.id"),
@@ -708,6 +687,10 @@ class NbSEnvironmentType(Base):
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # "Multiple": every intervention fits it, without links.
+    matches_all_interventions: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
 
 # ---------------------------------------------------------
@@ -739,6 +722,11 @@ class NbSInterventionType(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     intervention_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # "Monitoring": fits every environment, and every approach and societal
+    # challenge fits it, without links.
+    matches_all: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
 
 # ---------------------------------------------------------
@@ -754,6 +742,65 @@ class NbSSocietalChallengeType(Base):
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Addressed by every intervention, without links.
+    cross_cutting: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+
+
+# ---------------------------------------------------------
+# 10. Links between the NbS classifications (many-to-many)
+#
+#     Environment -> Intervention -> Approach
+#                                 -> Societal challenge
+#
+# Which options fit together, so each list only offers what fits the
+# choice above it. Seeded in app/core/seed_case_data_lookups.py.
+# ---------------------------------------------------------
+
+class NbSEnvironmentIntervention(Base):
+    """An intervention that can be carried out in an environment."""
+    __tablename__ = "nbs_environment_interventions"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    environment_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_environment_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    intervention_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_intervention_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
+class NbSInterventionApproach(Base):
+    """An approach an intervention can follow."""
+    __tablename__ = "nbs_intervention_approaches"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    intervention_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_intervention_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    approach_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_approach_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
+class NbSInterventionSocietalChallenge(Base):
+    """A societal challenge an intervention addresses (besides the cross-cutting ones)."""
+    __tablename__ = "nbs_intervention_societal_challenges"
+    __table_args__ = {"schema": CASE_DATA_SCHEMA}
+
+    intervention_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_intervention_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    societal_challenge_type_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.nbs_societal_challenge_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
 
 
 # ---------------------------------------------------------

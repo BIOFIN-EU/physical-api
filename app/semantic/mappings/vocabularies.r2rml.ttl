@@ -11,14 +11,6 @@
 @prefix bfx: <{{BASE}}ext#> .
 @prefix fibo-fnd-gao-obj: <https://spec.edmcouncil.org/fibo/ontology/FND/GoalsAndObjectives/Objectives/> .
 
-<#NbsTypeConcepts> a rr:TriplesMap ;
-  rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_types""" ] ;
-  rr:subjectMap [ rr:template "{{BASE}}concept/nbs-type/{code}" ; rr:class skos:Concept ] ;
-  rr:predicateObjectMap [ rr:predicate skos:prefLabel ; rr:objectMap [ rr:column "name" ; rr:language "en" ] ] ;
-  rr:predicateObjectMap [ rr:predicate skos:definition ; rr:objectMap [ rr:column "description" ; rr:language "en" ] ] ;
-  rr:predicateObjectMap [ rr:predicate skos:notation ; rr:objectMap [ rr:column "code" ] ] ;
-  rr:predicateObjectMap [ rr:predicate skos:inScheme ; rr:object <{{BASE}}concept/nbs-type> ] .
-
 <#NbsEnvironmentTypeConcepts> a rr:TriplesMap ;
   rr:logicalTable [ rr:sqlQuery """SELECT code, name, description FROM case_data.nbs_environment_types""" ] ;
   rr:subjectMap [ rr:template "{{BASE}}concept/nbs-environment-type/{code}" ; rr:class skos:Concept ] ;

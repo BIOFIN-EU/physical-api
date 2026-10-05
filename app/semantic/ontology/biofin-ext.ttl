@@ -53,10 +53,6 @@ bfx:workflowStatus a owl:DatatypeProperty ;
 # properties for these classifications.
 # =====================================================================
 
-bfx:hasNbSType a owl:ObjectProperty ;
-  rdfs:label "has NbS type"@en ;
-  rdfs:domain biofineu:NbS ; rdfs:range skos:Concept .
-
 bfx:hasEnvironmentType a owl:ObjectProperty ;
   rdfs:label "has environment type"@en ;
   rdfs:comment "The ecosystem type (EU MAES classes). Not biofineu:hasLandCoverClassification, which expects CORINE land cover classes."@en ;

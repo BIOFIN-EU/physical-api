@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
@@ -6,6 +6,7 @@ import logging
 from app.core.db import get_db
 from app.models.case_data import IntermediaryFunctionAssignment
 from app.models.lookup_registry import LOOKUP_REGISTRY
+from app.services.nbs_links import LOOKUP_FILTERS
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,9 @@ async def get_lookup(
     # Only the functions this intermediary provides (intermediary_function
     # lookup only), for dropdowns that depend on a chosen intermediary.
     intermediary_id: int | None = Query(default=None),
+    # FastAPI passes the request (for the linked-classification filters);
+    # None when called directly.
+    request: Request = None,
 ):
     logger.debug(f"Received lookup request for key: {lookup_key}")
 
@@ -39,6 +43,22 @@ async def get_lookup(
             IntermediaryFunctionAssignment,
             IntermediaryFunctionAssignment.intermediary_function_id == model.id,
         ).where(IntermediaryFunctionAssignment.intermediary_id == intermediary_id)
+    # Linked NbS classifications: only the options that fit the parent
+    # choice, e.g. ?nbs_environment_type_id=3 for interventions (see
+    # app/services/nbs_links.py). The parameter is the parent field's name.
+    for param, raw in (request.query_params.items() if request is not None else []):
+        if param == "intervention_id":
+            continue
+        link = LOOKUP_FILTERS.get((lookup_key, param))
+        if link is None:
+            raise HTTPException(status_code=400, detail=f"{param} does not filter the {lookup_key} lookup")
+        try:
+            parent_id = int(raw)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"{param} must be a number")
+        _, condition = link
+        query = query.where(condition(parent_id))
+
     if hasattr(model, "deleted_at"):
         query = query.where(model.deleted_at.is_(None))
 

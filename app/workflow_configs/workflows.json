@@ -299,13 +299,43 @@
           "submit_mode": "json",
           "fields": [
             {
-              "name": "nbs_type_id",
-              "display_name": "NbS Type",
-              "help_text": "The main kind of nature-based solution (NbS) the project delivers, for example agroforestry, wetland restoration or reforestation.",
+              "name": "nbs_environment_type_id",
+              "display_name": "NbS Environment Type",
+              "help_text": "The type of ecosystem the solution is in, for example cropland, forest, grassland, wetland, rivers and lakes, coastal or urban. Choose Multiple when it spans several.",
               "describe_options": true,
               "type": "select",
-              "required": true,
-              "options_source": "nbs_type"
+              "required": false,
+              "options_source": "nbs_environment_type"
+            },
+            {
+              "name": "nbs_intervention_type_id",
+              "display_name": "NbS Intervention Type",
+              "help_text": "The specific kind of intervention, for example protecting and conserving ecosystems, managing agricultural landscapes or restoring degraded ecosystems. Only interventions that fit the environment are offered, grouped by type: 1, better use of existing natural ecosystems; 2, managed or restored ecosystems; 3, new ecosystems.",
+              "describe_options": true,
+              "type": "select",
+              "required": false,
+              "options_source": "nbs_intervention_type",
+              "filter_by": "nbs_environment_type_id"
+            },
+            {
+              "name": "nbs_approach_type_id",
+              "display_name": "NbS Approach Type",
+              "help_text": "The overall approach the solution takes, for example ecological restoration, green infrastructure or ecosystem-based adaptation. Only approaches that fit the intervention are offered.",
+              "describe_options": true,
+              "type": "select",
+              "required": false,
+              "options_source": "nbs_approach_type",
+              "filter_by": "nbs_intervention_type_id"
+            },
+            {
+              "name": "nbs_societal_challenge_type_id",
+              "display_name": "NbS Societal Challenge Type",
+              "help_text": "The main societal challenge the solution helps address, for example climate resilience, water management, food security or human health. Only challenges the intervention addresses are offered.",
+              "describe_options": true,
+              "type": "select",
+              "required": false,
+              "options_source": "nbs_societal_challenge_type",
+              "filter_by": "nbs_intervention_type_id"
             },
             {
               "name": "implementation_stage_id",
@@ -315,42 +345,6 @@
               "type": "select",
               "required": false,
               "options_source": "implementation_stage"
-            },
-            {
-              "name": "nbs_environment_type_id",
-              "display_name": "NbS Environment Type",
-              "help_text": "The type of ecosystem the solution is in, for example cropland, forest, grassland, wetland, rivers and lakes, coastal or urban.",
-              "describe_options": true,
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_environment_type"
-            },
-            {
-              "name": "nbs_approach_type_id",
-              "display_name": "NbS Approach Type",
-              "help_text": "The overall approach the solution takes, for example ecological restoration, green infrastructure or ecosystem-based adaptation.",
-              "describe_options": true,
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_approach_type"
-            },
-            {
-              "name": "nbs_intervention_type_id",
-              "display_name": "NbS Intervention Type",
-              "help_text": "The specific kind of intervention, for example protecting and conserving ecosystems, managing agricultural landscapes or restoring degraded ecosystems.",
-              "describe_options": true,
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_intervention_type"
-            },
-            {
-              "name": "nbs_societal_challenge_type_id",
-              "display_name": "NbS Societal Challenge Type",
-              "help_text": "The main societal challenge the solution helps address, for example climate resilience, water management, food security or human health.",
-              "describe_options": true,
-              "type": "select",
-              "required": false,
-              "options_source": "nbs_societal_challenge_type"
             },
             {
               "name": "nbs_description",

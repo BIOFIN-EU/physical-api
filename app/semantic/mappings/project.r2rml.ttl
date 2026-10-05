@@ -56,10 +56,9 @@
 <#NbS> a rr:TriplesMap ;
   rr:logicalTable [ rr:sqlQuery """
     SELECT n.id, n.case_id, n.nbs_description,
-      t.code AS nbs_type, e.code AS environment_type, a.code AS approach_type,
+      e.code AS environment_type, a.code AS approach_type,
       i.code AS intervention_type, s.code AS societal_challenge, st.code AS implementation_stage
     FROM case_data.case_nature_based_solutions n
-    LEFT JOIN case_data.nbs_types t ON t.id = n.nbs_type_id
     LEFT JOIN case_data.nbs_environment_types e ON e.id = n.nbs_environment_type_id
     LEFT JOIN case_data.nbs_approach_types a ON a.id = n.nbs_approach_type_id
     LEFT JOIN case_data.nbs_intervention_types i ON i.id = n.nbs_intervention_type_id
@@ -70,7 +69,6 @@
   rr:subjectMap [ rr:template "{{BASE}}data/nbs/{id}" ; rr:class biofineu:NbS ] ;
   rr:predicateObjectMap [ rr:predicate biofineu:containsNbSProduct ; rr:objectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ] ;
   rr:predicateObjectMap [ rr:predicate dcterms:description ; rr:objectMap [ rr:column "nbs_description" ] ] ;
-  rr:predicateObjectMap [ rr:predicate bfx:hasNbSType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-type/{nbs_type}" ] ] ;
   rr:predicateObjectMap [ rr:predicate bfx:hasEnvironmentType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-environment-type/{environment_type}" ] ] ;
   rr:predicateObjectMap [ rr:predicate bfx:hasApproachType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-approach-type/{approach_type}" ] ] ;
   rr:predicateObjectMap [ rr:predicate bfx:hasInterventionType ; rr:objectMap [ rr:template "{{BASE}}concept/nbs-intervention-type/{intervention_type}" ] ] ;

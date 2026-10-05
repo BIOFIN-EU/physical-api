@@ -22,7 +22,7 @@ shape:Project a sh:NodeShape ;
 shape:NbS a sh:NodeShape ;
   sh:targetClass biofineu:NbS ;
   sh:property [ sh:path biofineu:containsNbSProduct ; sh:minCount 1 ] ;
-  sh:property [ sh:path bfx:hasNbSType ; sh:maxCount 1 ; sh:class skos:Concept ] ;
+  sh:property [ sh:path bfx:hasInterventionType ; sh:maxCount 1 ; sh:class skos:Concept ] ;
   sh:property [ sh:path biofineu:locatedInNUTSRegion ; sh:nodeKind sh:IRI ;
     sh:pattern "^http://data.europa.eu/nuts/code/[A-Z]{2}$" ] .
 

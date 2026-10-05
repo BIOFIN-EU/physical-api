@@ -63,7 +63,8 @@ class FinancingTypeStepInput(BaseModel):
 
 
 class NatureBasedSolutionStepInput(BaseModel):
-    nbs_type_id: int
+    # Unknown fields are ignored, so a case still on the old step config
+    # (which sent nbs_type_id) can be saved.
     implementation_stage_id: Optional[int] = None
     nbs_environment_type_id: Optional[int] = None
     nbs_approach_type_id: Optional[int] = None

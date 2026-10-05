@@ -7,9 +7,6 @@
 @prefix biofineu: <https://w3id.org/biofineu/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
-<{{BASE}}concept/nbs-type> a skos:ConceptScheme ;
-  skos:prefLabel "NbS types"@en .
-
 <{{BASE}}concept/nbs-environment-type> a skos:ConceptScheme ;
   skos:prefLabel "NbS environment types (EU MAES ecosystem types)"@en .
 

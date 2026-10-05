@@ -104,7 +104,7 @@ def pathway_project(cases):  # noqa: F811
     """An NbS pathway project with every section filled in, and a second project."""
     project, other = cases("use_case_2_v1"), cases("use_case_2_v1")
     with SessionLocal() as session:
-        nbs_type = _lookup(session, "nbs_types", "test_reforestation")
+        environment = _lookup(session, "nbs_environment_types", "test_forest")
         proceeds = _lookup(session, "use_of_proceeds", "test_land_purchase")
         specialty = _lookup(session, "operator_specialties", "test_forestry")
         netherlands = session.execute(text("SELECT id FROM case_data.countries WHERE code = 'NL'")).scalar_one()
@@ -113,8 +113,9 @@ def pathway_project(cases):  # noqa: F811
                 "INSERT INTO case_data.case_basic_info (case_id, name, high_level_description) VALUES (:c, :n, 'About it')"
             ), {"c": case_id, "n": name})
         session.execute(text(
-            "INSERT INTO case_data.case_nature_based_solutions (case_id, nbs_type_id, nbs_description) VALUES (:c, :t, 'Trees')"
-        ), {"c": project, "t": nbs_type})
+            "INSERT INTO case_data.case_nature_based_solutions (case_id, nbs_environment_type_id, nbs_description) "
+            "VALUES (:c, :e, 'Trees')"
+        ), {"c": project, "e": environment})
         session.execute(text(
             "INSERT INTO case_data.case_locations (case_id, country_id, location_type, geometry_wkt, area_sqm, area_is_manual, "
             "risk_id, friendly_name) VALUES (:c, :nl, 'polygon', 'POLYGON((5 52, 5.1 52, 5.1 52.1, 5 52))', 1234.5, false, "

@@ -108,29 +108,6 @@ class FinancingTypeRead(ORMBaseSchema):
     description: Optional[str] = None
 
 
-class NBSTypeBase(BaseModel):
-    code: str = Field(..., max_length=50)
-    name: str = Field(..., max_length=100)
-    description: Optional[str] = None
-
-
-class NBSTypeCreate(NBSTypeBase):
-    pass
-
-
-class NBSTypeUpdate(BaseModel):
-    code: Optional[str] = Field(None, max_length=50)
-    name: Optional[str] = Field(None, max_length=100)
-    description: Optional[str] = None
-
-
-class NBSTypeRead(ORMBaseSchema):
-    id: int
-    code: str
-    name: str
-    description: Optional[str] = None
-
-
 class ImplementationStageBase(BaseModel):
     code: str = Field(..., max_length=50)
     name: str = Field(..., max_length=100)
@@ -503,7 +480,6 @@ class CaseFinancingTypeRead(ORMBaseSchema):
 
 class CaseNatureBasedSolutionBase(BaseModel):
     case_id: int
-    nbs_type_id: int
     implementation_stage_id: Optional[int] = None
     nbs_environment_type_id: Optional[int] = None
     nbs_approach_type_id: Optional[int] = None
@@ -517,7 +493,6 @@ class CaseNatureBasedSolutionCreate(CaseNatureBasedSolutionBase):
 
 
 class CaseNatureBasedSolutionUpdate(BaseModel):
-    nbs_type_id: Optional[int] = None
     implementation_stage_id: Optional[int] = None
     nbs_environment_type_id: Optional[int] = None
     nbs_approach_type_id: Optional[int] = None
@@ -529,8 +504,6 @@ class CaseNatureBasedSolutionUpdate(BaseModel):
 class CaseNatureBasedSolutionRead(ORMBaseSchema):
     id: int
     case_id: int
-    nbs_type_id: int
-    nbs_type_name: Optional[str] = None
     implementation_stage_id: Optional[int] = None
     implementation_stage_name: Optional[str] = None
     nbs_environment_type_id: Optional[int] = None
