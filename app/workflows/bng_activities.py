@@ -21,6 +21,8 @@ from app.models.bng import (
     BNG_HABITAT_BANK_WORKFLOW,
     BNG_PRICING_STEP,
     LOCKED_ALLOCATION_STATUSES,
+    PERMISSION_GRANTED,
+    PLANNING_PERMISSION_STEP,
     BngCondition,
     BngHabitatParcel,
     BngHabitatType,
@@ -396,13 +398,23 @@ def _check_revenue_shares(session, case_id: int, answers: dict) -> None:
         )
 
 
-PERMISSION_GRANTED = ("Granted", "Granted with conditions")
-
-
 def _allocate_on_permission(session, case_id: int, answers: dict) -> None:
     """Planning permission granted: reserved units become allocated (step 14)."""
     if answers.get("decision") not in PERMISSION_GRANTED:
         return
+    _allocate_reserved(session, case_id)
+
+
+def _permission_granted(session, case_id: int) -> bool:
+    row = session.execute(
+        select(BngStepData).where(
+            BngStepData.case_id == case_id, BngStepData.step_code == PLANNING_PERMISSION_STEP
+        )
+    ).scalar_one_or_none()
+    return bool(row and (row.data or {}).get("decision") in PERMISSION_GRANTED)
+
+
+def _allocate_reserved(session, case_id: int) -> None:
     now = datetime.now(timezone.utc)
     for row in session.execute(
         select(BngUnitAllocation).where(
@@ -442,6 +454,11 @@ def _retire_on_gain_plan_approval(session, case_id: int, answers: dict) -> None:
     retired and locked (step 16) with a permanent transaction record whose
     reference goes on the gain plan (step 17).
     """
+    # Units reserved after permission was granted (accepted late, before
+    # accepting allocated them) are allocated now.
+    if _permission_granted(session, case_id):
+        _allocate_reserved(session, case_id)
+        session.flush()
     shortfall = _development_shortfall(session, case_id)
     missing = [f"{amount:.2f} {category}" for category, amount in shortfall.items() if amount > 0]
     if missing:

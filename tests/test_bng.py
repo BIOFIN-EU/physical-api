@@ -732,3 +732,50 @@ def test_date_fields_must_be_iso_dates(cases):
     BNG_ACTIVITIES["save_bng_commencement_step"](development, {"commencement_date": "2027-01-15"})
     BNG_ACTIVITIES["save_bng_planning_application_step"](development, {"application_reference": "A", "submission_date": None})
 
+
+
+def test_accepting_after_permission_allocates_at_once(cases, reference):
+    """The bank accepts only after planning permission was granted."""
+    bank = _priced_bank(cases, reference)
+    bank_owner = _owner(bank)
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Granted"})
+    assert _allocation(development, bank).status == "requested"
+
+    assert _action(_allocation(development, bank).id, "accept", bank_owner) == "allocated"
+    assert _allocation(development, bank).allocated_at is not None
+
+    BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-2"})
+    assert _allocation(development, bank).status == "retired"
+
+
+def test_gain_plan_allocates_units_left_reserved_after_permission(cases, reference):
+    """Units accepted after permission, before accepting allocated them, stayed reserved."""
+    bank = _priced_bank(cases, reference)
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Granted with conditions"})
+    with SessionLocal() as session:
+        session.execute(
+            text("UPDATE case_data.bng_unit_allocations SET status = 'reserved' WHERE development_case_id = :d"),
+            {"d": development},
+        )
+        session.commit()
+
+    BNG_ACTIVITIES["save_bng_gain_plan_approval_step"](development, {"gain_plan_reference": "GP-3"})
+    assert _allocation(development, bank).status == "retired"
+
+
+def test_accepting_without_permission_still_reserves(cases, reference):
+    bank = _priced_bank(cases, reference)
+    development = _development_needing(cases, reference, 44)
+    BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+        "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "44"}],
+    })
+    BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Refused"})
+    assert _action(_allocation(development, bank).id, "accept", _owner(bank)) == "reserved"

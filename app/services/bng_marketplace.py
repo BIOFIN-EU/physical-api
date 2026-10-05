@@ -12,7 +12,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.bng import ALLOCATION_DECIDING_ROLES, BngUnitAllocation
+from app.models.bng import (
+    ALLOCATION_DECIDING_ROLES,
+    PERMISSION_GRANTED,
+    PLANNING_PERMISSION_STEP,
+    BngStepData,
+    BngUnitAllocation,
+)
 from app.models.case_data import Case
 from app.services.bng_roles import act_as
 from app.services.case_user_access_service import get_case_user_access
@@ -23,6 +29,18 @@ ACTIONS = {
     "decline": ("habitat_bank", ("requested",), "declined"),
     "release": ("development", ("requested", "reserved"), "released"),
 }
+
+
+async def _permission_granted(db: AsyncSession, development_case_id: int) -> bool:
+    data = (
+        await db.execute(
+            select(BngStepData.data).where(
+                BngStepData.case_id == development_case_id,
+                BngStepData.step_code == PLANNING_PERMISSION_STEP,
+            )
+        )
+    ).scalar_one_or_none()
+    return bool(data and data.get("decision") in PERMISSION_GRANTED)
 
 
 async def apply_allocation_action(
@@ -64,6 +82,11 @@ async def apply_allocation_action(
         )
 
     now = datetime.now(timezone.utc)
+    if action == "accept" and await _permission_granted(db, allocation.development_case_id):
+        # Permission already granted: the units are allocated straight away,
+        # as they would have been had the bank accepted before it.
+        to_status = "allocated"
+        allocation.allocated_at = now
     allocation.status = to_status
     allocation.updated_by = user_id
     if action == "release":
