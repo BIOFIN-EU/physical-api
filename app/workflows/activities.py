@@ -47,6 +47,7 @@ from app.schemas.case_workflow import (
     IntermediaryStepInput
 )
 from app.schemas.risk import LocationRiskInput
+from app.services import nbs_links
 # NOTE: shapely/pyproj/country_detection are deliberately NOT imported at
 # module level here. This module is reachable from the Temporal workflow
 # definition (ConfigDrivenCaseWorkflow -> activity_registry -> activities),
@@ -816,6 +817,11 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
     _log_activity_payload("save_nature_based_solution_step", case_id, payload)
 
     with SessionLocal() as session:
+        # Environment -> intervention -> approach / societal challenge must fit.
+        errors = nbs_links.mismatches(session, payload.model_dump())
+        if errors:
+            _raise_validation_error("Please correct the highlighted fields.", errors)
+
         _begin_user_write(session, case_id, actor)
 
         existing = session.execute(
@@ -825,7 +831,6 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
         ).scalar_one_or_none()
 
         if existing:
-            existing.nbs_type_id = payload.nbs_type_id
             existing.implementation_stage_id = payload.implementation_stage_id
             existing.nbs_environment_type_id = payload.nbs_environment_type_id
             existing.nbs_approach_type_id = payload.nbs_approach_type_id
@@ -838,7 +843,6 @@ def save_nature_based_solution_step(case_id: int, data: dict) -> None:
             session.add(
                 CaseNatureBasedSolution(
                     case_id=case_id,
-                    nbs_type_id=payload.nbs_type_id,
                     implementation_stage_id=payload.implementation_stage_id,
                     nbs_environment_type_id=payload.nbs_environment_type_id,
                     nbs_approach_type_id=payload.nbs_approach_type_id,

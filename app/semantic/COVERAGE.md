@@ -20,7 +20,6 @@ rows (`deleted_at`) are not exported.
 | `case_basic_info.name` | `dcterms:title`, `rdfs:label` | Std |
 | `case_basic_info.high_level_description` | `dcterms:description` | Std |
 | `case_nature_based_solutions` | `data/nbs/{id}` a `biofineu:NbS`; `biofineu:containsNbSProduct` → project, and project `biofineu:isContainedInNbS` → NbS | Base |
-| `….nbs_type_id` | `bfx:hasNbSType` → `concept/nbs-type/{code}` | Ext |
 | `….nbs_environment_type_id` | `bfx:hasEnvironmentType` (MAES classes; not `biofineu:hasLandCoverClassification`, which expects CORINE) | Ext |
 | `….nbs_approach_type_id` | `bfx:hasApproachType` | Ext |
 | `….nbs_intervention_type_id` | `bfx:hasInterventionType` | Ext |
@@ -80,7 +79,7 @@ rows (`deleted_at`) are not exported.
 
 Each becomes a `skos:ConceptScheme` `concept/{scheme}` with a `skos:Concept` per row
 (`skos:prefLabel` = name, `skos:definition` = description, `skos:notation` = code):
-`nbs_types`, `nbs_environment_types`, `nbs_approach_types`,
+`nbs_environment_types`, `nbs_approach_types`,
 `nbs_intervention_types` (+ `bfx:interventionCategory`), `nbs_societal_challenge_types`,
 `implementation_stages`, `financing_types`, `use_of_proceeds`, `operator_specialties`,
 `intermediary_functions` (+ `bfx:functionCategory`), `bng_habitat_types`

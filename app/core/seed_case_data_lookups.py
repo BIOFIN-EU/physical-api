@@ -1,13 +1,15 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case_data import (
+    NbSEnvironmentIntervention,
+    NbSInterventionApproach,
+    NbSInterventionSocietalChallenge,
     UseOfProceeds,
     OperatorSpecialty,
     Country,
     Currency,
     FinancingType,
-    NBSType,
     ImplementationStage,
     NbSEnvironmentType,
     NbSApproachType,
@@ -209,24 +211,6 @@ async def seed_financing_types(db: AsyncSession):
     for code, name, description in values:
         await _upsert_by_code(db, FinancingType, code, name, description)
 
-
-# ---------------------------------------------------------
-# NBS Types
-# ---------------------------------------------------------
-
-async def seed_nbs_types(db: AsyncSession):
-    values = [
-        ("agroforestry", "Agroforestry", "Integration of trees into agricultural systems"),
-        ("wetland_restoration", "Wetland Restoration", "Restoration of wetlands for biodiversity and water regulation"),
-        ("reforestation", "Reforestation", "Planting trees to restore forest ecosystems"),
-        ("soil_restoration", "Soil Restoration", "Improving soil health and fertility"),
-        ("river_restoration", "River Restoration", "Restoration of river ecosystems and natural flow"),
-        ("urban_greening", "Urban Greening", "Green infrastructure in urban environments"),
-        ("coastal_restoration", "Coastal Restoration", "Restoration of coastal and marine ecosystems"),
-    ]
-
-    for code, name, description in values:
-        await _upsert_by_code(db, NBSType, code, name, description)
 
 # ---------------------------------------------------------
 # Implementation Stages
@@ -513,6 +497,149 @@ async def seed_intermediary_functions(db: AsyncSession):
 # ---------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------
+# Links between the NbS classifications
+#
+#     Environment -> Intervention -> Approach
+#                                 -> Societal challenge
+#
+# Interventions follow D2.2 Table 4 (types 1-3, Somarakis et al. 2019).
+# The links are a first draft for expert review (D2.2 says the mapping of
+# societal challenges to interventions is still to be developed). This table
+# is the one place to change them: on startup the link tables are synced to
+# it (missing links added, links no longer listed removed).
+# ---------------------------------------------------------
+
+# "Multiple": every intervention fits it.
+NBS_ENVIRONMENTS_MATCHING_ALL = ("multiple",)
+# Fits every environment; every approach and societal challenge fits it.
+NBS_INTERVENTIONS_MATCHING_ALL = ("ecosystem_monitoring",)
+# Addressed by every intervention.
+NBS_CROSS_CUTTING_CHALLENGES = (
+    "climate_resilience",
+    "biodiversity_enhancement",
+    "social_justice_cohesion",
+    "green_jobs",
+    "participatory_governance",
+    "knowledge_capacity_building",
+)
+
+NBS_INTERVENTION_LINKS = {
+    # Type 1 - better use of protected / natural ecosystems
+    "protection_conservation_terrestrial": {
+        "environments": ["forest", "grassland", "inland_wetland", "rivers_lakes_ponds", "sparsely_vegetated"],
+        "approaches": ["area_based_conservation", "ecosystem_based_adaptation", "ecosystem_based_mitigation",
+                       "ecosystem_based_drr", "ecosystem_based_forest_management"],
+        "challenges": ["water_management", "disaster_risk_reduction"],
+    },
+    "protection_conservation_marine_coastal": {
+        "environments": ["coastal_shelf_open_ocean", "marine_inlets_transitional"],
+        "approaches": ["area_based_conservation", "ecosystem_based_fisheries_management", "ecosystem_based_adaptation",
+                       "ecosystem_based_mitigation", "ecosystem_based_drr"],
+        "challenges": ["food_security", "disaster_risk_reduction"],
+    },
+    # Type 2 - sustainability and multifunctionality of managed or restored ecosystems
+    "agricultural_landscape_management": {
+        "environments": ["cropland", "grassland"],
+        "approaches": ["ecosystem_based_agricultural_management", "ecosystem_based_water_management",
+                       "ecosystem_based_adaptation", "ecosystem_based_mitigation", "green_infrastructure"],
+        "challenges": ["food_security", "water_management"],
+    },
+    "coastal_landscape_management": {
+        "environments": ["coastal_shelf_open_ocean", "marine_inlets_transitional"],
+        "approaches": ["ecosystem_based_adaptation", "ecosystem_based_mitigation", "ecosystem_based_drr",
+                       "ecosystem_based_fisheries_management", "green_infrastructure"],
+        "challenges": ["disaster_risk_reduction", "food_security", "place_regeneration"],
+    },
+    "extensive_urban_green_management": {
+        "environments": ["urban_ecosystem"],
+        "approaches": ["green_infrastructure", "ecosystem_based_adaptation", "ecosystem_based_mitigation"],
+        "challenges": ["green_space_management", "human_health_wellbeing", "air_quality", "place_regeneration"],
+    },
+    # ecosystem_monitoring: matches all (above)
+    # Type 3 - design and management of new ecosystems
+    "intensive_urban_green_management": {
+        "environments": ["urban_ecosystem"],
+        "approaches": ["green_infrastructure", "ecological_engineering", "ecosystem_based_adaptation",
+                       "ecosystem_based_mitigation"],
+        "challenges": ["green_space_management", "human_health_wellbeing", "air_quality", "place_regeneration",
+                       "disaster_risk_reduction"],
+    },
+    "urban_planning_strategies": {
+        "environments": ["urban_ecosystem"],
+        "approaches": ["green_infrastructure", "ecosystem_based_adaptation", "ecosystem_based_drr",
+                       "ecosystem_based_water_management"],
+        "challenges": ["place_regeneration", "green_space_management", "human_health_wellbeing", "air_quality",
+                       "disaster_risk_reduction"],
+    },
+    "urban_water_management": {
+        "environments": ["urban_ecosystem", "rivers_lakes_ponds"],
+        "approaches": ["ecosystem_based_water_management", "green_infrastructure", "ecological_engineering",
+                       "ecosystem_based_drr", "ecosystem_based_adaptation"],
+        "challenges": ["water_management", "disaster_risk_reduction", "human_health_wellbeing"],
+    },
+    "restoration_degraded_terrestrial": {
+        "environments": ["forest", "grassland", "cropland", "sparsely_vegetated"],
+        "approaches": ["ecological_restoration", "ecological_engineering", "ecosystem_based_forest_management",
+                       "ecosystem_based_agricultural_management", "ecosystem_based_adaptation",
+                       "ecosystem_based_mitigation"],
+        "challenges": ["water_management", "disaster_risk_reduction", "food_security", "air_quality"],
+    },
+    "restoration_semi_natural_water": {
+        "environments": ["inland_wetland", "rivers_lakes_ponds"],
+        "approaches": ["ecological_restoration", "ecological_engineering", "ecosystem_based_water_management",
+                       "ecosystem_based_drr", "ecosystem_based_adaptation"],
+        "challenges": ["water_management", "disaster_risk_reduction", "human_health_wellbeing"],
+    },
+    "restoration_degraded_marine_coastal": {
+        "environments": ["coastal_shelf_open_ocean", "marine_inlets_transitional"],
+        "approaches": ["ecological_restoration", "ecological_engineering", "ecosystem_based_fisheries_management",
+                       "ecosystem_based_drr", "ecosystem_based_adaptation", "ecosystem_based_mitigation"],
+        "challenges": ["disaster_risk_reduction", "food_security"],
+    },
+}
+
+
+async def _ids_by_code(db: AsyncSession, model) -> dict[str, int]:
+    return {code: id_ for id_, code in (await db.execute(select(model.id, model.code))).all()}
+
+
+async def _sync_links(db: AsyncSession, link_model, left_column: str, right_column: str, pairs: set[tuple[int, int]]):
+    left = getattr(link_model, left_column)
+    right = getattr(link_model, right_column)
+    existing = {tuple(row) for row in (await db.execute(select(left, right))).all()}
+    for left_id, right_id in existing - pairs:
+        await db.execute(delete(link_model).where(left == left_id, right == right_id))
+    for left_id, right_id in pairs - existing:
+        db.add(link_model(**{left_column: left_id, right_column: right_id}))
+
+
+async def seed_nbs_links(db: AsyncSession):
+    await db.flush()
+    environments = await _ids_by_code(db, NbSEnvironmentType)
+    interventions = await _ids_by_code(db, NbSInterventionType)
+    approaches = await _ids_by_code(db, NbSApproachType)
+    challenges = await _ids_by_code(db, NbSSocietalChallengeType)
+
+    for model, column, codes in (
+        (NbSEnvironmentType, "matches_all_interventions", NBS_ENVIRONMENTS_MATCHING_ALL),
+        (NbSInterventionType, "matches_all", NBS_INTERVENTIONS_MATCHING_ALL),
+        (NbSSocietalChallengeType, "cross_cutting", NBS_CROSS_CUTTING_CHALLENGES),
+    ):
+        await db.execute(update(model).values({column: model.code.in_(codes)}))
+
+    environment_pairs, approach_pairs, challenge_pairs = set(), set(), set()
+    for intervention, links in NBS_INTERVENTION_LINKS.items():
+        i = interventions[intervention]
+        environment_pairs |= {(environments[code], i) for code in links["environments"]}
+        approach_pairs |= {(i, approaches[code]) for code in links["approaches"]}
+        challenge_pairs |= {(i, challenges[code]) for code in links["challenges"]}
+
+    await _sync_links(db, NbSEnvironmentIntervention, "environment_type_id", "intervention_type_id", environment_pairs)
+    await _sync_links(db, NbSInterventionApproach, "intervention_type_id", "approach_type_id", approach_pairs)
+    await _sync_links(db, NbSInterventionSocietalChallenge, "intervention_type_id", "societal_challenge_type_id", challenge_pairs)
+
+
+# ---------------------------------------------------------
 
 async def seed_case_data_lookups(db: AsyncSession):
     await seed_use_of_proceeds_types(db)
@@ -520,13 +647,13 @@ async def seed_case_data_lookups(db: AsyncSession):
     await seed_countries(db)
     await seed_currencies(db)
     await seed_financing_types(db)
-    await seed_nbs_types(db)
     await seed_implementation_stages(db)
 
     await seed_nbs_environment_types(db)
     await seed_nbs_approach_types(db)
     await seed_nbs_intervention_types(db)
     await seed_nbs_societal_challenge_types(db)
+    await seed_nbs_links(db)
 
     await seed_intermediary_functions(db)
 

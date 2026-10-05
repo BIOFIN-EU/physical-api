@@ -178,7 +178,6 @@ def serialize_nbs(row: CaseNatureBasedSolution) -> dict[str, Any]:
             "case_id",
             "created_at",
             "updated_at",
-            "nbs_type_id",
             "implementation_stage_id",
             "nbs_environment_type_id",
             "nbs_approach_type_id",
@@ -187,7 +186,6 @@ def serialize_nbs(row: CaseNatureBasedSolution) -> dict[str, Any]:
         },
     )
 
-    data["nbs_type"] = serialize_lookup(row.nbs_type)
     data["implementation_stage"] = serialize_lookup(row.implementation_stage)
     data["nbs_environment_type"] = serialize_lookup(row.nbs_environment_type)
     data["nbs_approach_type"] = serialize_lookup(row.nbs_approach_type)
@@ -294,7 +292,6 @@ SECTION_CONFIG: dict[str, SectionConfig] = {
         model=CaseNatureBasedSolution,
         serializer=serialize_nbs,
         loader_options=(
-            selectinload(CaseNatureBasedSolution.nbs_type),
             selectinload(CaseNatureBasedSolution.implementation_stage),
             selectinload(CaseNatureBasedSolution.nbs_environment_type),
             selectinload(CaseNatureBasedSolution.nbs_approach_type),
