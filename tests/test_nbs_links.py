@@ -116,6 +116,14 @@ def test_approaches_and_challenges_follow_the_intervention():
     )
 
 
+def test_interventions_carry_their_type_heading():
+    request = Request({"type": "http", "query_string": b"", "headers": []})
+    rows = _run(lambda db: get_lookup("nbs_intervention_type", db=db, intermediary_id=None, request=request))
+    monitoring = next(r for r in rows if r["code"] == "ecosystem_monitoring")
+    assert monitoring["group"] == "type_2"
+    assert monitoring["group_label"].startswith("Type 2")
+
+
 def test_unknown_filters_are_refused():
     with pytest.raises(HTTPException) as exc:
         _lookup("nbs_approach_type", nbs_environment_type_id=1)

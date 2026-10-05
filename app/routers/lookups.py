@@ -6,7 +6,7 @@ import logging
 from app.core.db import get_db
 from app.models.case_data import IntermediaryFunctionAssignment
 from app.models.lookup_registry import LOOKUP_REGISTRY
-from app.services.nbs_links import LOOKUP_FILTERS
+from app.services.nbs_links import INTERVENTION_TYPE_LABELS, LOOKUP_FILTERS
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +87,9 @@ async def get_lookup(
 
         if hasattr(row, "intervention_type"):
             item["intervention_type"] = row.intervention_type
+            # For lists grouped by type (an option's group and its heading).
+            item["group"] = row.intervention_type
+            item["group_label"] = INTERVENTION_TYPE_LABELS.get(row.intervention_type, row.intervention_type)
 
         response.append(item)
 
