@@ -65,6 +65,12 @@ ACCEPTED_ALLOCATION_STATUSES = ("reserved", "allocated", "retired")
 # Can no longer be changed or released.
 LOCKED_ALLOCATION_STATUSES = ("allocated", "retired")
 
+# A development's reserved units become allocated once its planning
+# permission is granted (step 14): when that step is saved, or when a bank
+# accepts a request after it was saved.
+PLANNING_PERMISSION_STEP = "planning_permission"
+PERMISSION_GRANTED = ("Granted", "Granted with conditions")
+
 # Roles a user can hold on a BNG project (Phase 3), several per user. They
 # decide which steps a user may submit (the step's "roles" in the workflow
 # config); case_user_access still decides whether they can open the project.
