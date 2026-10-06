@@ -18,14 +18,10 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.bng import BngCaseRole
-from app.models.case_data import Case, CaseUserAccess
+from app.models.case_data import Case, CaseUserAccess, CaseWorkflowRole
+from app.services.access_levels import apply_level
 from app.services.case_delete_service import soft_delete_case
-from app.services.case_user_access_service import (
-    PERMISSION_FLAGS,
-    access_summary,
-    create_case_access_audit_log,
-)
+from app.services.case_user_access_service import access_summary, create_case_access_audit_log
 
 REASON = "account closed"
 
@@ -59,8 +55,7 @@ async def release_closed_account(db: AsyncSession, *, user_id: UUID) -> dict:
             continue
         before = access_summary(successor)
         successor.is_owner = True
-        for flag in PERMISSION_FLAGS:
-            setattr(successor, flag, True)
+        apply_level(successor, "manager")
         await create_case_access_audit_log(
             db, case_id=access.case_id, actor_user_id=user_id, target_user_id=successor.user_id,
             action="ownership_transferred",
@@ -84,7 +79,7 @@ async def release_closed_account(db: AsyncSession, *, user_id: UUID) -> dict:
             workflows_to_stop[case_id] = workflow_id
 
     case_ids = [access.case_id for access, _ in memberships]
-    await db.execute(delete(BngCaseRole).where(BngCaseRole.user_id == user_id))
+    await db.execute(delete(CaseWorkflowRole).where(CaseWorkflowRole.user_id == user_id))
     await db.execute(delete(CaseUserAccess).where(CaseUserAccess.user_id == user_id))
     await db.commit()
 

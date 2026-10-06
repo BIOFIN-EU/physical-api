@@ -282,7 +282,9 @@ def test_non_bng_payload_has_no_bng_keys(case_id):
 
 # ---------- phase 2: marketplace lifecycle ----------
 
-from app.models.bng import BNG_CREATOR_ROLE, BngCaseRole, BngTransaction  # noqa: E402
+from app.models.bng import BngTransaction  # noqa: E402
+from app.models.case_data import CaseWorkflowRole  # noqa: E402
+from app.services.workflow_config_service import WorkflowConfigService  # noqa: E402
 from app.models.case_data import CaseUserAccess  # noqa: E402
 from app.services.bng_marketplace import apply_allocation_action  # noqa: E402
 from app.services.bng_payload import bank_finances  # noqa: E402
@@ -295,12 +297,12 @@ def _owner(case_id: int) -> uuid.UUID:
     user = uuid.uuid4()
     with SessionLocal() as session:
         session.add(CaseUserAccess(
-            case_id=case_id, user_id=user, case_role="borrower", is_owner=True,
+            case_id=case_id, user_id=user, is_owner=True,
             can_view=True, can_update=True, can_delete=True, can_assign_users=True,
         ))
-        role = BNG_CREATOR_ROLE.get(session.get(Case, case_id).case_type)
+        role = WorkflowConfigService().get_workflow(session.get(Case, case_id).case_type).get("creator_role")
         if role:
-            session.add(BngCaseRole(case_id=case_id, user_id=user, role=role))
+            session.add(CaseWorkflowRole(case_id=case_id, user_id=user, role=role))
         session.commit()
     return user
 
@@ -489,7 +491,8 @@ from app.schemas.bng_requests import (  # noqa: E402
     RemedialActionComplete,
 )
 from app.services import bng_monitoring  # noqa: E402
-from app.services.bng_roles import act_as, authorize_step, set_user_roles, user_roles  # noqa: E402
+from app.services.project_members import change_member  # noqa: E402
+from app.services.workflow_roles import act_as, authorize_step, user_roles  # noqa: E402
 
 
 def _member(case_id: int, *roles: str, manager: bool = False) -> uuid.UUID:
@@ -497,11 +500,11 @@ def _member(case_id: int, *roles: str, manager: bool = False) -> uuid.UUID:
     user = uuid.uuid4()
     with SessionLocal() as session:
         session.add(CaseUserAccess(
-            case_id=case_id, user_id=user, case_role="intermediary",
+            case_id=case_id, user_id=user,
             can_view=True, can_update=True, can_delete=False, can_assign_users=manager,
         ))
         for role in roles:
-            session.add(BngCaseRole(case_id=case_id, user_id=user, role=role))
+            session.add(CaseWorkflowRole(case_id=case_id, user_id=user, role=role))
         session.commit()
     return user
 
@@ -522,9 +525,9 @@ def _authorize(case_id, user, step, payload):
 
 def test_steps_without_roles_are_untouched(cases):
     development = cases(BNG_DEVELOPMENT_WORKFLOW)
-    payload = {"name": "x", "_decision": "rejected", "_bng_on_behalf": True}
+    payload = {"name": "x", "_decision": "rejected", "_on_behalf": True}
     assert _authorize(development, _member(development), {"fields": []}, payload) is None
-    assert payload == {"name": "x", "_decision": "rejected", "_bng_on_behalf": True}
+    assert payload == {"name": "x", "_decision": "rejected", "_on_behalf": True}
 
 
 def test_step_roles_and_recording_on_behalf(cases):
@@ -538,20 +541,20 @@ def test_step_roles_and_recording_on_behalf(cases):
     }
     with pytest.raises(HTTPException) as exc:
         _authorize(development, developer, LPA_STEP, {"decision": "Granted"})
-    assert exc.value.status_code == 403 and exc.value.detail["code"] == "bng_role_required"
+    assert exc.value.status_code == 403 and exc.value.detail["code"] == "role_required"
 
     # A manager must confirm they record it on the LPA's behalf.
     with pytest.raises(HTTPException) as exc:
         _authorize(development, manager, LPA_STEP, {"decision": "Granted"})
-    assert exc.value.detail["code"] == "bng_on_behalf_confirmation_required"
-    payload = {"decision": "Granted", "_bng_on_behalf": True}
+    assert exc.value.detail["code"] == "on_behalf_confirmation_required"
+    payload = {"decision": "Granted", "_on_behalf": True}
     assert _authorize(development, manager, LPA_STEP, payload)["on_behalf"] is True
     assert payload == {"decision": "Granted"}  # frontend keys removed
 
     # Without allow_on_behalf only the role itself can.
     with pytest.raises(HTTPException) as exc:
-        _authorize(development, manager, {"roles": ["lpa"]}, {"_bng_on_behalf": True})
-    assert exc.value.detail["code"] == "bng_role_required"
+        _authorize(development, manager, {"roles": ["lpa"]}, {"_on_behalf": True})
+    assert exc.value.detail["code"] == "role_required"
 
 
 def test_rejection_needs_a_reason(cases):
@@ -585,19 +588,25 @@ def test_a_user_can_hold_several_roles(cases):
     with SessionLocal() as session:  # added with view access only
         session.execute(text(f"UPDATE case_data.case_user_access SET can_update = false WHERE user_id = '{member}'"))
         session.commit()
-    assert _run(lambda db: set_user_roles(
-        db, case_id=bank, user_id=member, roles=["landowner", "investor"], actor_user_id=owner
-    )) == ["landowner", "investor"]
+    config = WorkflowConfigService().get_workflow(BNG_HABITAT_BANK_WORKFLOW)
+
+    def change(user, roles):
+        return _run(lambda db: change_member(
+            db, case_id=bank, actor=_access(bank, owner), user_id=user, level=None, roles=roles,
+            workflow_config=config,
+        ))
+
+    change(member, ["landowner", "investor"])
     assert _run(lambda db: user_roles(db, bank, member)) == {"landowner", "investor"}
     assert _access(bank, member).can_update  # a role lets them submit its steps
-    _run(lambda db: set_user_roles(db, case_id=bank, user_id=member, roles=["investor"], actor_user_id=owner))
+    change(member, ["investor"])
     assert _run(lambda db: user_roles(db, bank, member)) == {"investor"}
 
-    with pytest.raises(HTTPException) as exc:
-        _run(lambda db: set_user_roles(db, case_id=bank, user_id=member, roles=["mayor"], actor_user_id=owner))
+    with pytest.raises(HTTPException) as exc:  # not a role of this workflow
+        change(member, ["developer"])
     assert exc.value.status_code == 422
     with pytest.raises(HTTPException) as exc:  # not a project member
-        _run(lambda db: set_user_roles(db, case_id=bank, user_id=uuid.uuid4(), roles=["lpa"], actor_user_id=owner))
+        change(uuid.uuid4(), ["lpa"])
     assert exc.value.status_code == 404
 
 
@@ -617,7 +626,7 @@ def test_marketplace_decisions_need_the_role(cases, reference):
     manager = _member(bank, manager=True)
     with pytest.raises(HTTPException) as exc:
         _action(allocation_id, "accept", manager)
-    assert exc.value.detail["code"] == "bng_on_behalf_confirmation_required"
+    assert exc.value.detail["code"] == "on_behalf_confirmation_required"
     assert _run(lambda db: apply_allocation_action(
         db, allocation_id=allocation_id, action="accept", user_id=manager, on_behalf=True
     )).status == "reserved"

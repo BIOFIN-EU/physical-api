@@ -14,10 +14,6 @@ class OnBehalfRequest(BaseModel):
     on_behalf: bool = False
 
 
-class BngRolesUpdate(BaseModel):
-    roles: list[str] = Field(default_factory=list, max_length=5)
-
-
 class MonitoringReportSubmit(OnBehalfRequest):
     habitats_on_track: bool
     condition_summary: str = Field(min_length=1, max_length=4000)

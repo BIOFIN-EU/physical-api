@@ -239,7 +239,7 @@
     SELECT id, step_code, role, decision, comment,
       CASE WHEN on_behalf THEN 'true' ELSE 'false' END AS on_behalf,
       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created
-    FROM case_data.bng_step_signoffs WHERE case_id = {{CASE_ID}}
+    FROM case_data.case_step_signoffs WHERE case_id = {{CASE_ID}}
   """ ] ;
   rr:subjectMap [ rr:template "{{BASE}}data/signoff/{id}" ; rr:class bfx:StepSignoff ] ;
   rr:predicateObjectMap [ rr:predicate bfx:stepCode ; rr:objectMap [ rr:column "step_code" ] ] ;
@@ -250,7 +250,7 @@
   rr:predicateObjectMap [ rr:predicate prov:endedAtTime ; rr:objectMap [ rr:column "created" ; rr:datatype xsd:dateTime ] ] .
 
 <#ProjectSignoff> a rr:TriplesMap ;
-  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.bng_step_signoffs WHERE case_id = {{CASE_ID}}""" ] ;
+  rr:logicalTable [ rr:sqlQuery """SELECT id, case_id FROM case_data.case_step_signoffs WHERE case_id = {{CASE_ID}}""" ] ;
   rr:subjectMap [ rr:template "{{BASE}}data/project/{case_id}" ] ;
   rr:predicateObjectMap [ rr:predicate bfx:hasSignoff ; rr:objectMap [ rr:template "{{BASE}}data/signoff/{id}" ] ] .
 

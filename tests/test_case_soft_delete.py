@@ -14,6 +14,7 @@ from sqlalchemy.pool import NullPool
 
 from app.core.settings import settings
 from app.dependencies.case_access import require_case_permission
+from app.dependencies.gateway_identity import RequestIdentity
 from app.models.case_data import Case, CaseUserAccess
 from app.services.case_delete_service import soft_delete_case
 from app.services.case_state import fetch_cases
@@ -42,7 +43,6 @@ def _grant(case_id: int, user_id: uuid.UUID, can_delete: bool) -> None:
             CaseUserAccess(
                 case_id=case_id,
                 user_id=user_id,
-                case_role="borrower",
                 is_owner=can_delete,
                 can_view=True,
                 can_update=True,
@@ -89,7 +89,7 @@ def test_deleted_case_endpoints_return_404(case_id):
     async def body(db):
         await soft_delete_case(db, case_id=case_id, user_id=owner)
         with pytest.raises(HTTPException) as exc:
-            await check(case_id=case_id, db=db, user_id=owner)
+            await check(case_id=case_id, db=db, identity=RequestIdentity(owner, [], []))
         return exc.value.status_code
 
     assert _run(body) == 404

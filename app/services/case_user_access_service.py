@@ -1,18 +1,17 @@
 import json
 from uuid import UUID
+
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.bng import BngCaseRole
-from app.models.case_data import Case, CaseUserAccess, CaseAccessAuditLog
-
-PERMISSION_FLAGS = ("can_view", "can_update", "can_delete", "can_assign_users")
+from app.models.case_data import Case, CaseAccessAuditLog, CaseUserAccess, CaseWorkflowRole
+from app.services.access_levels import Level, apply_level, level_of
 
 
 def access_summary(access: CaseUserAccess) -> dict:
     """A member's access, as recorded in the audit log's details."""
-    return {"case_role": access.case_role, **{flag: getattr(access, flag) for flag in PERMISSION_FLAGS}}
+    return {"level": level_of(access)}
 
 
 async def get_case_user_access(
@@ -35,45 +34,33 @@ async def get_case_user_access(
     return result.scalar_one_or_none()
 
 
+async def _member_or_404(db: AsyncSession, case_id: int, user_id: UUID) -> CaseUserAccess:
+    access = await get_case_user_access(db=db, case_id=case_id, user_id=user_id)
+    if access is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This user isn't a member of the project.")
+    return access
+
+
 async def create_case_user_access(
         db: AsyncSession,
         *,
         case_id: int,
         user_id: UUID,
         actor_user_id: UUID,
-        case_role: str,
-        can_view: bool,
-        can_update: bool,
-        can_delete: bool,
-        can_assign_users: bool,
-
+        level: Level,
 ) -> CaseUserAccess:
-    result = await db.execute(
-        select(CaseUserAccess).where(
-            CaseUserAccess.case_id == case_id,
-            CaseUserAccess.user_id == user_id,
-        )
+    """Add a member at this level (audited; not committed)."""
+    existing = await db.scalar(
+        select(CaseUserAccess).where(CaseUserAccess.case_id == case_id, CaseUserAccess.user_id == user_id)
     )
-
-    existing = result.scalar_one_or_none()
-
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This user is already a member of the project.",
         )
 
-    access = CaseUserAccess(
-        case_id=case_id,
-        user_id=user_id,
-        case_role=case_role,
-        is_owner=False,
-        can_view=can_view,
-        can_update=can_update,
-        can_delete=can_delete,
-        can_assign_users=can_assign_users,
-    )
-
+    access = CaseUserAccess(case_id=case_id, user_id=user_id, is_owner=False)
+    apply_level(access, level)
     db.add(access)
 
     await create_case_access_audit_log(
@@ -84,10 +71,6 @@ async def create_case_user_access(
         action="user_added",
         details=json.dumps(access_summary(access)),
     )
-
-    await db.commit()
-    await db.refresh(access)
-
     return access
 
 
@@ -97,23 +80,10 @@ async def update_case_user_access(
         case_id: int,
         user_id: UUID,
         actor_user_id: UUID,
-        case_role: str | None = None,
-        can_view: bool | None = None,
-        can_update: bool | None = None,
-        can_delete: bool | None = None,
-        can_assign_users: bool | None = None,
+        level: Level,
 ) -> CaseUserAccess:
-    access = await get_case_user_access(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-    )
-
-    if access is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User does not have access to this case",
-        )
+    """Change a member's level (audited when it changes; not committed)."""
+    access = await _member_or_404(db, case_id, user_id)
 
     if access.is_owner:
         # The owner always keeps full access (they can't be locked out).
@@ -123,35 +93,19 @@ async def update_case_user_access(
         )
 
     before = access_summary(access)
-
-    if case_role is not None:
-        access.case_role = case_role
-
-    if can_view is not None:
-        access.can_view = can_view
-
-    if can_update is not None:
-        access.can_update = can_update
-
-    if can_delete is not None:
-        access.can_delete = can_delete
-
-    if can_assign_users is not None:
-        access.can_assign_users = can_assign_users
-
-    await create_case_access_audit_log(
-        db=db,
-        case_id=case_id,
-        actor_user_id=actor_user_id,
-        target_user_id=user_id,
-        action="user_access_updated",
-        details=json.dumps({"before": before, "after": access_summary(access)}),
-    )
-
-    await db.commit()
-    await db.refresh(access)
-
+    apply_level(access, level)
+    after = access_summary(access)
+    if before != after:
+        await create_case_access_audit_log(
+            db=db,
+            case_id=case_id,
+            actor_user_id=actor_user_id,
+            target_user_id=user_id,
+            action="user_access_updated",
+            details=json.dumps({"before": before, "after": after}),
+        )
     return access
+
 
 async def delete_case_user_access(
     db: AsyncSession,
@@ -160,22 +114,13 @@ async def delete_case_user_access(
     user_id: UUID,
     actor_user_id: UUID
 ) -> None:
-    access = await get_case_user_access(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-    )
-
-    if access is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User does not have access to this case",
-        )
+    """Remove a member and their roles (audited; committed)."""
+    access = await _member_or_404(db, case_id, user_id)
 
     if access.is_owner:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot remove the case owner",
+            detail="The project owner can't be removed.",
         )
 
     await create_case_access_audit_log(
@@ -188,9 +133,44 @@ async def delete_case_user_access(
     )
 
     # Their roles go with them (they would come back if re-added).
-    await db.execute(delete(BngCaseRole).where(BngCaseRole.case_id == case_id, BngCaseRole.user_id == user_id))
+    await db.execute(
+        delete(CaseWorkflowRole).where(CaseWorkflowRole.case_id == case_id, CaseWorkflowRole.user_id == user_id)
+    )
     await db.delete(access)
     await db.commit()
+
+
+async def transfer_ownership(
+    db: AsyncSession,
+    *,
+    case_id: int,
+    owner: CaseUserAccess,
+    new_owner_id: UUID,
+) -> CaseUserAccess:
+    """
+    Hand the project over to another member, who becomes its owner (with
+    full access); the previous owner stays on as a manager. Committed.
+    """
+    # This session's copy of the owner's row (the one passed in may be from elsewhere).
+    owner = await get_case_user_access(db, case_id, owner.user_id) or owner
+    if not owner.is_owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the project owner can hand it over.")
+    if new_owner_id == owner.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already own this project.")
+
+    new_owner = await _member_or_404(db, case_id, new_owner_id)
+    before = access_summary(new_owner)
+    owner.is_owner = False
+    apply_level(owner, "manager")
+    new_owner.is_owner = True
+    apply_level(new_owner, "manager")
+    await create_case_access_audit_log(
+        db, case_id=case_id, actor_user_id=owner.user_id, target_user_id=new_owner_id,
+        action="ownership_transferred",
+        details=json.dumps({"before": before, "after": access_summary(new_owner)}),
+    )
+    await db.commit()
+    return new_owner
 
 
 async def create_case_access_audit_log(

@@ -64,8 +64,8 @@ rows (`deleted_at`) are not exported.
 | `bng_monitoring_reports` | `data/monitoring-report/{id}` a `biofineu:MonitoringReport`; bank `biofineu:producesMonitoringReport`, report `biofineu:reportsOn` bank, `biofineu:hasReportingDate` (submitted); `bfx:monitoringYear`, `dueDate`, `monitoringStatus`, `habitatsOnTrack`, `conditionSummary`, `managementCarriedOut`, `onBehalf`, `verificationNotes`, `verifiedAt`, `verifiedAsRole` | Base / Ext |
 | `bng_monitoring_reports.submitted_by`, `verified_by` | – | Out (user ids) |
 | `bng_remedial_actions` | `data/remedial-action/{id}` a `bfx:RemedialAction` (⊂ `biofineu:NaturePositiveActivity`); report `bfx:requiresRemedialAction`; `dcterms:description`, `bfx:dueDate`, `bfx:actionStatus`, `bfx:completionNotes`, `prov:endedAtTime` | Ext / Base |
-| `bng_step_signoffs` | `data/signoff/{id}` a `bfx:StepSignoff` (⊂ `prov:Activity`); project `bfx:hasSignoff`; `bfx:stepCode`, `bfx:decision`, `bfx:signedOffAsRole` → BNG role concept, `bfx:onBehalf`, `rdfs:comment`, `prov:endedAtTime` | Ext |
-| `bng_step_signoffs.user_id` | – | Out (user id) |
+| `case_step_signoffs` (BNG projects) | `data/signoff/{id}` a `bfx:StepSignoff` (⊂ `prov:Activity`); project `bfx:hasSignoff`; `bfx:stepCode`, `bfx:decision`, `bfx:signedOffAsRole` → BNG role concept, `bfx:onBehalf`, `rdfs:comment`, `prov:endedAtTime` | Ext |
+| `case_step_signoffs.user_id` | – | Out (user id) |
 | `bng_step_data` (every step) | `data/step-record/{id}` a `bfx:StepRecord`, with a `bfx:StepAnswer` (`bfx:fieldName`, `rdf:value`) per plain answer | Ext |
 | `bng_step_data` HMMP `monitoring_frequency` | project `biofineu:hasReportingFrequency` | Base |
 | `bng_step_data` HMMP `management_period_years` | `bfx:managementPeriodYears` | Ext |
@@ -73,7 +73,7 @@ rows (`deleted_at`) are not exported.
 | `bng_step_data` Unit Pricing prices | project `bfx:pricePerHabitatUnit` / `Hedgerow` / `Watercourse` → `schema:MonetaryAmount` (GBP) | Ext |
 | `bng_step_data` Site Registration `landowner_name`, `contact_email` | – | Out (personal) |
 | `bng_step_data` answers that are lists or files (e.g. `bng_documents`) | – | Out (not plain values) |
-| `bng_case_roles` | – | Out (which user holds which role; the roles appear on sign-offs) |
+| `case_workflow_roles` | – | Out (which user holds which role; BNG roles appear on sign-offs) |
 
 ## Code lists (`mappings/vocabularies.r2rml.ttl`, `concepts/concept-schemes.ttl`)
 

@@ -23,7 +23,6 @@ from sqlalchemy.orm import selectinload
 
 from app.models.bng import (
     BNG_HABITAT_BANK_WORKFLOW,
-    BNG_ROLE_LABELS,
     MONITORING_BANK_ROLES,
     MONITORING_YEARS,
     VERIFIER_ROLES,
@@ -34,7 +33,7 @@ from app.models.bng import (
 from app.models.case_data import Case, CaseUserAccess
 from app.models.workflow import CaseWorkflowRun
 from app.schemas.bng_requests import MonitoringReportSubmit, MonitoringReportVerify, RemedialActionComplete
-from app.services.bng_roles import act_as
+from app.services.workflow_roles import act_as, role_label
 from app.services.case_user_access_service import get_case_user_access
 
 REGISTER_STEP = "gain_site_register"
@@ -111,7 +110,7 @@ def serialize_report(report: BngMonitoringReport, today: date | None = None) -> 
         "verified_at": _iso(report.verified_at),
         "verified_by": str(report.verified_by) if report.verified_by else None,
         "verified_as": report.verified_as,
-        "verified_as_label": BNG_ROLE_LABELS.get(report.verified_as or "", None),
+        "verified_as_label": role_label(report.verified_as),
         "verified_on_behalf": report.verified_on_behalf,
         "remedial_actions": [
             {

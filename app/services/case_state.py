@@ -400,6 +400,7 @@ async def build_case_payload(
 
 
 async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
+    """The projects the user is a member of."""
     stmt = (
         select(
             Case,
@@ -414,10 +415,38 @@ async def fetch_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
             Case.deleted_at.is_(None),
         )
     )
+    return _case_list((await db.execute(stmt)).all())
 
-    result = await db.execute(stmt)
-    rows = result.all()
 
+async def fetch_all_cases(db: AsyncSession, user_id: UUID) -> list[dict[str, Any]]:
+    """
+    Every project (administrators' support list), newest first; isMember
+    says whether the administrator is on it themselves.
+    """
+    stmt = (
+        select(
+            Case,
+            CaseBasicInfo.name,
+            CaseBasicInfo.high_level_description,
+            CaseUserAccess.can_delete,
+            CaseUserAccess.id.is_not(None),
+        )
+        .outerjoin(
+            CaseUserAccess,
+            (CaseUserAccess.case_id == Case.id) & (CaseUserAccess.user_id == user_id),
+        )
+        .outerjoin(CaseBasicInfo, CaseBasicInfo.case_id == Case.id)
+        .where(Case.deleted_at.is_(None))
+        .order_by(Case.created_at.desc())
+    )
+    rows = (await db.execute(stmt)).all()
+    listed = _case_list([row[:4] for row in rows])
+    for item, row in zip(listed, rows):
+        item["isMember"] = bool(row[4])
+    return listed
+
+
+def _case_list(rows) -> list[dict[str, Any]]:
     workflows = WorkflowConfigService().load_all().get("workflows", {})
 
     return [

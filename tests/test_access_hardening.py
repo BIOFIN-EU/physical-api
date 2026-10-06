@@ -15,15 +15,15 @@ from sqlalchemy import select
 
 from app.core.settings import settings
 from app.main import app
-from app.models.bng import BngCaseRole
-from app.models.case_data import Case, CaseAccessAuditLog, CaseUserAccess
+from app.models.case_data import Case, CaseAccessAuditLog, CaseUserAccess, CaseWorkflowRole
 from app.services.account_closure_service import release_closed_account
-from app.services.bng_roles import set_user_roles
 from app.services.case_user_access_service import (
     create_case_user_access,
     delete_case_user_access,
     update_case_user_access,
 )
+from app.services.project_members import change_member
+from app.services.workflow_config_service import WorkflowConfigService
 from app.workflows.activities import SessionLocal
 
 from tests.test_bng import cases  # noqa: F401 (fixture)
@@ -34,7 +34,7 @@ def _member(case_id: int, *, owner: bool = False, manager: bool = False) -> uuid
     user_id = uuid.uuid4()
     with SessionLocal() as session:
         session.add(CaseUserAccess(
-            case_id=case_id, user_id=user_id, case_role="borrower", is_owner=owner,
+            case_id=case_id, user_id=user_id, is_owner=owner,
             can_view=True, can_update=owner or manager, can_delete=owner, can_assign_users=owner or manager,
         ))
         session.commit()
@@ -86,7 +86,7 @@ def test_owner_access_cannot_be_changed(case_id):
     owner, manager = _member(case_id, owner=True), _member(case_id, manager=True)
     with pytest.raises(HTTPException) as exc:
         _run(lambda db: update_case_user_access(
-            db, case_id=case_id, user_id=owner, actor_user_id=manager, can_assign_users=False
+            db, case_id=case_id, user_id=owner, actor_user_id=manager, level="viewer"
         ))
     assert exc.value.status_code == 409
     assert _access(case_id, owner).can_assign_users
@@ -96,32 +96,40 @@ def test_adding_an_existing_member_is_a_conflict(case_id):
     owner, member = _member(case_id, owner=True), _member(case_id)
     with pytest.raises(HTTPException) as exc:
         _run(lambda db: create_case_user_access(
-            db, case_id=case_id, user_id=member, actor_user_id=owner, case_role="funder",
-            can_view=True, can_update=False, can_delete=False, can_assign_users=False,
+            db, case_id=case_id, user_id=member, actor_user_id=owner, level="viewer",
         ))
     assert exc.value.status_code == 409
 
 
 def test_access_changes_record_what_changed(case_id):
     owner, member = _member(case_id, owner=True), _member(case_id)
-    _run(lambda db: update_case_user_access(db, case_id=case_id, user_id=member, actor_user_id=owner, can_update=True))
+    async def body(db):
+        await update_case_user_access(db, case_id=case_id, user_id=member, actor_user_id=owner, level="editor")
+        await db.commit()
+    _run(body)
     action, details = _audit(case_id)[-1]
     assert action == "user_access_updated"
     change = json.loads(details)
-    assert change["before"]["can_update"] is False and change["after"]["can_update"] is True
+    assert change == {"before": {"level": "viewer"}, "after": {"level": "editor"}}
 
 
 def test_role_changes_are_audited_and_removed_with_the_member(cases):  # noqa: F811
     case_id = cases("bng_habitat_bank_v1")
     owner, member = _member(case_id, owner=True), _member(case_id)
-    _run(lambda db: set_user_roles(db, case_id=case_id, user_id=member, roles=["ecologist", "lpa"], actor_user_id=owner))
-    _run(lambda db: set_user_roles(db, case_id=case_id, user_id=member, roles=["lpa"], actor_user_id=owner))
+    config = WorkflowConfigService().get_workflow("bng_habitat_bank_v1")
+    owner_access = _access(case_id, owner)
+    for roles in (["ecologist", "lpa"], ["lpa"]):
+        _run(lambda db: change_member(
+            db, case_id=case_id, actor=owner_access, user_id=member, level=None, roles=roles, workflow_config=config
+        ))
     roles = [(a, d) for a, d in _audit(case_id) if a.startswith("role_")]
     assert roles == [("role_assigned", "ecologist"), ("role_assigned", "lpa"), ("role_removed", "ecologist")]
 
     _run(lambda db: delete_case_user_access(db, case_id=case_id, user_id=member, actor_user_id=owner))
     with SessionLocal() as session:
-        left = session.scalars(select(BngCaseRole).where(BngCaseRole.case_id == case_id, BngCaseRole.user_id == member)).all()
+        left = session.scalars(select(CaseWorkflowRole).where(
+            CaseWorkflowRole.case_id == case_id, CaseWorkflowRole.user_id == member
+        )).all()
     assert left == []
 
 
@@ -133,7 +141,7 @@ def test_closing_an_account_hands_projects_over(cases):  # noqa: F811
     with SessionLocal() as session:
         for case_id in (shared, solo):
             session.add(CaseUserAccess(
-                case_id=case_id, user_id=leaving, case_role="borrower", is_owner=True,
+                case_id=case_id, user_id=leaving, is_owner=True,
                 can_view=True, can_update=True, can_delete=True, can_assign_users=True,
             ))
         session.commit()
@@ -141,7 +149,7 @@ def test_closing_an_account_hands_projects_over(cases):  # noqa: F811
     _member(joined, owner=True)
     with SessionLocal() as session:
         session.add(CaseUserAccess(
-            case_id=joined, user_id=leaving, case_role="funder", is_owner=False,
+            case_id=joined, user_id=leaving, is_owner=False,
             can_view=True, can_update=False, can_delete=False, can_assign_users=False,
         ))
         session.commit()

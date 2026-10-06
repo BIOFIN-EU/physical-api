@@ -16,7 +16,8 @@ from app.services.bng_matching import (
     reservation_status,
 )
 from app.services.bng_payload import vocabulary
-from app.services.bng_roles import capacity_for, my_capacities
+from app.services.workflow_config_service import WorkflowConfigService
+from app.services.workflow_roles import bng_capacities, capacity_for, step_capacities, user_roles
 from app.workflows.activities import SessionLocal
 from app.workflows.bng_activities import BNG_ACTIVITIES
 
@@ -78,7 +79,7 @@ def test_capacity_for_own_role_on_behalf_or_none():
 
 def test_vocabulary_labels_every_code():
     labels = vocabulary()
-    assert [r["code"] for r in labels["roles"]] == ["landowner", "investor", "developer", "ecologist", "lpa"]
+    assert {r["code"] for r in labels["roles"]} == {"landowner", "investor", "developer", "ecologist", "lpa"}
     assert {c["code"]: c["size_unit"] for c in labels["categories"]} == {"area": "ha", "hedgerow": "km", "watercourse": "km"}
     assert labels["allocation_statuses"]["requested"] == "Requested"
     assert labels["monitoring_statuses"]["submitted"] == "Awaiting verification"
@@ -147,19 +148,23 @@ def test_my_capacities_per_step_and_action(cases):
     development = cases(BNG_DEVELOPMENT_WORKFLOW)
     developer = _member(development, "developer")
     manager = _member(development, manager=True)
+    config = WorkflowConfigService().get_workflow(BNG_DEVELOPMENT_WORKFLOW)
 
-    mine = _run(lambda db: my_capacities(db, _case(development), _access(development, developer)))
-    assert mine["steps"]["offsite_allocation"]["kind"] == "own"
-    assert mine["steps"]["planning_permission"]["kind"] == "none"     # the LPA's
+    def steps(case_id, user):
+        held = _run(lambda db: user_roles(db, case_id, user))
+        return step_capacities(held, _access(case_id, user), config)
+
+    assert steps(development, developer)["offsite_allocation"]["kind"] == "own"
+    assert steps(development, developer)["planning_permission"]["kind"] == "none"     # the LPA's
+    mine = _run(lambda db: bng_capacities(db, _case(development), _access(development, developer)))
     assert mine["allocations"]["kind"] == "own"                        # the developer releases
     assert mine["monitoring_submit"] is None and mine["monitoring_verify"] is None
 
-    managed = _run(lambda db: my_capacities(db, _case(development), _access(development, manager)))
-    assert managed["steps"]["planning_permission"] == {"kind": "on_behalf", "role": "lpa", "roles": ["lpa"]}
+    assert steps(development, manager)["planning_permission"] == {"kind": "on_behalf", "role": "lpa", "roles": ["lpa"]}
 
     bank = cases(BNG_HABITAT_BANK_WORKFLOW)
     ecologist = _member(bank, "ecologist")
-    at_bank = _run(lambda db: my_capacities(db, _case(bank), _access(bank, ecologist)))
+    at_bank = _run(lambda db: bng_capacities(db, _case(bank), _access(bank, ecologist)))
     assert at_bank["allocations"]["kind"] == "none"                   # landowner or investor decide
     assert at_bank["monitoring_verify"]["kind"] == "own"
     assert at_bank["monitoring_submit"]["kind"] == "none"
