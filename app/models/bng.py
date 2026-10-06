@@ -71,24 +71,7 @@ LOCKED_ALLOCATION_STATUSES = ("allocated", "retired")
 PLANNING_PERMISSION_STEP = "planning_permission"
 PERMISSION_GRANTED = ("Granted", "Granted with conditions")
 
-# Roles a user can hold on a BNG project (Phase 3), several per user. They
-# decide which steps a user may submit (the step's "roles" in the workflow
-# config); case_user_access still decides whether they can open the project.
-BNG_ROLES = ("landowner", "investor", "developer", "ecologist", "lpa")
-BNG_ROLE_LABELS = {
-    "landowner": "Landowner / Habitat Bank",
-    "investor": "Investor",
-    "developer": "Developer",
-    "ecologist": "Ecologist",
-    "lpa": "Local Planning Authority",
-}
-# The role the creator of a new BNG project gets.
-BNG_CREATOR_ROLE = {
-    BNG_HABITAT_BANK_WORKFLOW: "landowner",
-    BNG_DEVELOPMENT_WORKFLOW: "developer",
-}
-
-# How a step was signed off (bng_step_signoffs.decision).
+# How a step was signed off (case_step_signoffs.decision).
 SIGNOFF_DECISIONS = ("submitted", "approved", "rejected", "edited")
 SIGNOFF_DECISION_LABELS = {"submitted": "Completed", "approved": "Approved", "rejected": "Rejected", "edited": "Edited"}
 
@@ -364,74 +347,8 @@ class BngTransaction(ActorStampMixin, Base):
     )
 
 
-# ---------------------------------------------------------
-# Roles and sign-offs (Phase 3)
-# ---------------------------------------------------------
-
-class BngCaseRole(ActorStampMixin, Base):
-    """One BNG role of a user on a project (a user can have several)."""
-
-    __tablename__ = "bng_case_roles"
-    __table_args__ = (
-        UniqueConstraint("case_id", "user_id", "role", name="uq_bng_case_roles_case_user_role"),
-        CheckConstraint(
-            "role IN ('landowner', 'investor', 'developer', 'ecologist', 'lpa')",
-            name="ck_bng_case_roles_role",
-        ),
-        {"schema": CASE_DATA_SCHEMA},
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
-    role: Mapped[str] = mapped_column(String(20), nullable=False)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
-
-
-class BngStepSignoff(Base):
-    """
-    Who submitted, approved, rejected or edited a BNG step, and in which
-    role: either their own, or recorded on behalf of another role (e.g. the
-    developer recording the LPA's decision). Append-only history.
-    """
-
-    __tablename__ = "bng_step_signoffs"
-    __table_args__ = (
-        CheckConstraint(
-            "decision IN ('submitted', 'approved', 'rejected', 'edited')",
-            name="ck_bng_step_signoffs_decision",
-        ),
-        {"schema": CASE_DATA_SCHEMA},
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[int] = mapped_column(
-        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    step_code: Mapped[str] = mapped_column(String(100), nullable=False)
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    # The role the step was signed off as (the user's own, or on behalf of).
-    role: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    on_behalf: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    decision: Mapped[str] = mapped_column(String(20), nullable=False)
-    comment: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
+# Roles and sign-offs: app.models.case_data (CaseWorkflowRole,
+# CaseStepSignoff), shared by every workflow.
 
 # ---------------------------------------------------------
 # Monitoring, verification and remedial actions (Phase 3)

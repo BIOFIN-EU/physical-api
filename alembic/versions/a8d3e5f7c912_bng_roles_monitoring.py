@@ -22,11 +22,46 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-from app.models.bng import (
-    BngCaseRole,
-    BngMonitoringReport,
-    BngRemedialAction,
-    BngStepSignoff,
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+from app.models.bng import BngMonitoringReport, BngRemedialAction
+
+# The two tables as this revision created them (later renamed to
+# case_workflow_roles and case_step_signoffs, revision c4e8a2f6b913), so
+# this revision doesn't depend on today's models.
+_metadata = sa.MetaData()
+sa.Table("cases", _metadata, sa.Column("id", sa.Integer, primary_key=True), schema="case_data")
+BngCaseRole = sa.Table(
+    "bng_case_roles", _metadata,
+    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+    sa.Column("case_id", sa.Integer, sa.ForeignKey("case_data.cases.id", ondelete="CASCADE"), nullable=False, index=True),
+    sa.Column("user_id", PGUUID(as_uuid=True), nullable=False, index=True),
+    sa.Column("role", sa.String(20), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.Column("created_by", PGUUID(as_uuid=True), nullable=True),
+    sa.Column("updated_by", PGUUID(as_uuid=True), nullable=True),
+    sa.UniqueConstraint("case_id", "user_id", "role", name="uq_bng_case_roles_case_user_role"),
+    sa.CheckConstraint(
+        "role IN ('landowner', 'investor', 'developer', 'ecologist', 'lpa')", name="ck_bng_case_roles_role"
+    ),
+    schema="case_data",
+)
+BngStepSignoff = sa.Table(
+    "bng_step_signoffs", _metadata,
+    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+    sa.Column("case_id", sa.Integer, sa.ForeignKey("case_data.cases.id", ondelete="CASCADE"), nullable=False, index=True),
+    sa.Column("step_code", sa.String(100), nullable=False),
+    sa.Column("user_id", PGUUID(as_uuid=True), nullable=False),
+    sa.Column("role", sa.String(20), nullable=True),
+    sa.Column("on_behalf", sa.Boolean, nullable=False),
+    sa.Column("decision", sa.String(20), nullable=False),
+    sa.Column("comment", sa.String(2000), nullable=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+    sa.CheckConstraint(
+        "decision IN ('submitted', 'approved', 'rejected', 'edited')", name="ck_bng_step_signoffs_decision"
+    ),
+    schema="case_data",
 )
 
 # revision identifiers, used by Alembic.
@@ -47,7 +82,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     bind = op.get_bind()
     for model in NEW_TABLES:
-        model.__table__.create(bind, checkfirst=True)
+        getattr(model, "__table__", model).create(bind, checkfirst=True)
 
     existing = {c["name"] for c in sa.inspect(bind).get_columns("bng_transactions", schema=S)}
     for name in SHARE_COLUMNS:
@@ -74,4 +109,4 @@ def downgrade() -> None:
         op.drop_column("bng_transactions", name, schema=S)
     bind = op.get_bind()
     for model in reversed(NEW_TABLES):
-        model.__table__.drop(bind, checkfirst=True)
+        getattr(model, "__table__", model).drop(bind, checkfirst=True)

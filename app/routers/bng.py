@@ -13,15 +13,12 @@ from app.dependencies.gateway_identity import get_request_user_id
 from app.models.bng import (
     BNG_DEVELOPMENT_WORKFLOW,
     BNG_HABITAT_BANK_WORKFLOW,
-    BNG_ROLE_LABELS,
-    BNG_ROLES,
     BNG_WORKFLOWS,
 )
 from app.models.case_data import Case, CaseUserAccess
 from app.schemas.bng import HabitatParcelsPreview
 from app.schemas.bng_requests import (
     AllocationSuggestionsRequest,
-    BngRolesUpdate,
     MonitoringReportSubmit,
     MonitoringReportVerify,
     OnBehalfRequest,
@@ -43,14 +40,7 @@ from app.services.bng_monitoring import (
     verify_report,
 )
 from app.services.workflow_config_service import WorkflowConfigService
-from app.services.bng_roles import (
-    case_roles,
-    case_signoffs,
-    my_capacities,
-    set_user_roles,
-    user_roles,
-    waiting_for_user,
-)
+from app.services.workflow_roles import bng_capacities, case_signoffs, user_roles
 from app.services.bng_payload import (
     available_habitat_banks,
     bank_finances,
@@ -249,11 +239,6 @@ async def release_allocation(
 # Phase 3: roles and sign-offs
 # ---------------------------------------------------------
 
-@router.get("/roles")
-async def list_roles(user_id: UUID = Depends(get_request_user_id)) -> list[dict[str, str]]:
-    return [{"code": role, "label": BNG_ROLE_LABELS[role]} for role in BNG_ROLES]
-
-
 @router.get("/cases/{case_id}/my-access")
 async def get_my_access(
     case_id: int,
@@ -261,42 +246,16 @@ async def get_my_access(
     access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> dict[str, Any]:
     """
-    The current user's BNG roles, whether they can act on behalf of others,
-    and what that lets them do on this project (capacities).
+    What the user's roles let them do on this BNG project outside its steps
+    (allocation requests, monitoring); steps: /case_workflow/cases/{id}/my-access.
     """
     case = await _bng_case_or_404(db, case_id)
     return {
         "roles": sorted(await user_roles(db, case_id, access.user_id)),
         "can_update": access.can_update,
         "can_record_on_behalf": access.can_assign_users,
-        "capacities": await my_capacities(db, case, access),
+        "capacities": await bng_capacities(db, case, access),
     }
-
-
-@router.get("/cases/{case_id}/roles")
-async def get_case_roles(
-    case_id: int,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_view")),
-) -> dict[str, list[str]]:
-    """{user_id: [roles]} of the project's members."""
-    await _bng_case_or_404(db, case_id)
-    return await case_roles(db, case_id)
-
-
-@router.put("/cases/{case_id}/roles/{member_id}")
-async def put_case_roles(
-    case_id: int,
-    member_id: UUID,
-    body: BngRolesUpdate,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
-) -> dict[str, Any]:
-    await _bng_case_or_404(db, case_id)
-    roles = await set_user_roles(
-        db, case_id=case_id, user_id=member_id, roles=body.roles, actor_user_id=access.user_id
-    )
-    return {"user_id": str(member_id), "roles": roles}
 
 
 @router.get("/cases/{case_id}/signoffs")
@@ -307,15 +266,6 @@ async def get_case_signoffs(
 ) -> list[dict[str, Any]]:
     await _bng_case_or_404(db, case_id)
     return await case_signoffs(db, case_id)
-
-
-@router.get("/waiting")
-async def get_waiting_for_me(
-    db: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_request_user_id),
-) -> list[dict[str, Any]]:
-    """BNG projects whose current step is for one of the user's roles."""
-    return await waiting_for_user(db, user_id)
 
 
 # ---------------------------------------------------------

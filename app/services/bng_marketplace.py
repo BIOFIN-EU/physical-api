@@ -20,7 +20,7 @@ from app.models.bng import (
     BngUnitAllocation,
 )
 from app.models.case_data import Case
-from app.services.bng_roles import act_as
+from app.services.workflow_roles import act_as
 from app.services.case_user_access_service import get_case_user_access
 
 # action -> (whose project decides, statuses it applies to, new status)

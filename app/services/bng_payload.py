@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.bng import (
+    BNG_WORKFLOWS,
     ACCEPTED_ALLOCATION_STATUSES,
     ACTIVE_ALLOCATION_STATUSES,
     ALLOCATION_STATUS_LABELS,
@@ -23,8 +24,6 @@ from app.models.bng import (
     BNG_CATEGORY_LABELS,
     BNG_HABITAT_BANK_WORKFLOW,
     BNG_PRICING_STEP,
-    BNG_ROLE_LABELS,
-    BNG_ROLES,
     BNG_SIZE_UNITS,
     BNG_UNIT_NAMES,
     MONITORING_STATUS_LABELS,
@@ -51,7 +50,8 @@ from app.services.bng_finance import (
 )
 from app.services.bng_metric import ParcelUnits, parcel_units, summarise
 from app.services.bng_monitoring import bank_reports, monitoring_summary
-from app.services.bng_roles import case_signoffs
+from app.services.workflow_config_service import WorkflowConfigService
+from app.services.workflow_roles import case_signoffs, role_catalogue
 
 UNIT_COLUMN = {
     "area": "habitat_units",
@@ -380,10 +380,21 @@ async def available_habitat_banks(db: AsyncSession) -> list[dict[str, Any]]:
     return listed
 
 
+def bng_role_codes() -> list[str]:
+    """The roles the BNG workflows use, in the order they first appear."""
+    workflows = WorkflowConfigService().load_all().get("workflows") or {}
+    codes: list[str] = []
+    for code in BNG_WORKFLOWS:
+        for role in (workflows.get(code) or {}).get("roles") or []:
+            if role not in codes:
+                codes.append(role)
+    return codes
+
+
 def vocabulary() -> dict[str, Any]:
     """How BNG codes are shown, so the frontend keeps no copy of them."""
     return {
-        "roles": [{"code": role, "label": BNG_ROLE_LABELS[role]} for role in BNG_ROLES],
+        "roles": [{"code": code, "label": role_catalogue()[code]["label"]} for code in bng_role_codes()],
         "categories": [
             {
                 "code": category,

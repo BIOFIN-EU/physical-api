@@ -15,6 +15,8 @@ from app.core.seed_bng import seed_bng_reference_data
 from app.core.exceptions import AppError
 from app.core.internal_auth import require_internal_secret
 from app.services.object_storage_service import ensure_bucket_exists
+from app.services.workflow_config_service import WorkflowConfigService
+from app.services.workflow_roles import validate_role_config
 
 
 setup_logging()
@@ -24,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # A role typo in workflows.json would silently lock a step: stop instead.
+    validate_role_config(WorkflowConfigService().load_all())
+
     ensure_bucket_exists()
 
     await init_db()

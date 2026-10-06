@@ -65,10 +65,6 @@ class CaseUserAccess(Base):
     __tablename__ = "case_user_access"
     __table_args__ = (
         UniqueConstraint("case_id", "user_id", name="uq_case_user_access_case_user"),
-        CheckConstraint(
-            "case_role IN ('borrower', 'funder', 'intermediary')",
-            name="ck_case_user_access_case_role",
-        ),
         {"schema": CASE_DATA_SCHEMA},
     )
 
@@ -86,8 +82,8 @@ class CaseUserAccess(Base):
         index=True,
     )
 
-    case_role: Mapped[str] = mapped_column(String(50), nullable=False)
-
+    # The access level (see app.services.access_levels): viewer = view,
+    # editor = + update, manager = + delete and managing members.
     can_view: Mapped[bool] = mapped_column(nullable=False, default=True)
     can_update: Mapped[bool] = mapped_column(nullable=False, default=False)
     can_delete: Mapped[bool] = mapped_column(nullable=False, default=False)
@@ -105,6 +101,71 @@ class CaseUserAccess(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+class CaseWorkflowRole(ActorStampMixin, Base):
+    """
+    A workflow role a member holds on a project (several per member), e.g.
+    the project's Ecologist. The roles a project can have, and the steps
+    each completes, come from its workflow config ("roles").
+    """
+
+    __tablename__ = "case_workflow_roles"
+    __table_args__ = (
+        UniqueConstraint("case_id", "user_id", "role", name="uq_case_workflow_roles_case_user_role"),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class CaseStepSignoff(Base):
+    """
+    Who submitted, approved, rejected or edited a step that has roles, and
+    in which role: their own, or recorded on behalf of another (e.g. a
+    manager recording the LPA's decision). Append-only history.
+    """
+
+    __tablename__ = "case_step_signoffs"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('submitted', 'approved', 'rejected', 'edited')",
+            name="ck_case_step_signoffs_decision",
+        ),
+        {"schema": CASE_DATA_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CASE_DATA_SCHEMA}.cases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    step_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    # The role the step was signed off as (the user's own, or on behalf of).
+    role: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    on_behalf: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    comment: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
 
 class CaseAccessAuditLog(Base):
     __tablename__ = "case_access_audit_logs"

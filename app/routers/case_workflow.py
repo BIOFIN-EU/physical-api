@@ -12,7 +12,7 @@ from temporalio.service import RPCError, RPCStatusCode
 from app.core.db import get_db
 from app.core.settings import settings
 from app.dependencies.gateway_identity import get_request_user_id
-from app.models.case_data import CaseDocument, CaseUserAccess, CaseAccessAuditLog, Country
+from app.models.case_data import CaseDocument, CaseUserAccess, Country
 from app.models.workflow import CaseWorkflowRun
 from app.schemas.case_workflow import DetectCountryRequest
 from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
@@ -25,12 +25,11 @@ from app.services.case_step_edit_service import update_case_step_data
 from app.services.case_step_draft_service import get_case_step_draft, upsert_case_step_draft
 from app.schemas.case_step_draft import CaseStepDraftRequest, CaseStepDraftResponse
 from app.dependencies.case_access import require_case_permission
-from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAccessRequest
-from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
-from app.services.auth_user_service import resolve_user_id_by_email
+from app.services.access_levels import apply_level
+from app.services.workflow_config_service import WorkflowConfigService
 from app.services.case_delete_service import soft_delete_case, stop_deleted_case_workflow
 from app.workflows.actor import ACTOR_KEY
-from app.services.bng_roles import add_creator_role, authorize_step, is_rejection, record_signoff
+from app.services.workflow_roles import add_creator_role, authorize_step, is_rejection, record_signoff
 
 logger = logging.getLogger(__name__)
 
@@ -138,20 +137,13 @@ async def start_case(
 
     case_id = int(temporal_workflow_id.replace("case-", ""))
 
-    db.add(
-        CaseUserAccess(
-            case_id=case_id,
-            user_id=user_id,
-            case_role="borrower",
-            is_owner=True,
-            can_view=True,
-            can_update=True,
-            can_delete=True,
-            can_assign_users=True,
-        )
+    owner = CaseUserAccess(case_id=case_id, user_id=user_id, is_owner=True)
+    apply_level(owner, "manager")
+    db.add(owner)
+    # The workflow's creator role (e.g. Borrower, Landowner, Developer).
+    add_creator_role(
+        db, case_id=case_id, workflow_config=WorkflowConfigService().get_workflow(workflow_code), user_id=user_id
     )
-    # BNG projects only: the creator's BNG role (landowner / developer).
-    add_creator_role(db, case_id=case_id, workflow_code=workflow_code, user_id=user_id)
 
     await db.commit()
 
@@ -712,147 +704,3 @@ async def delete_case(
     temporal_workflow_id = await soft_delete_case(db, case_id=case_id, user_id=user_id)
     if temporal_workflow_id:
         await stop_deleted_case_workflow(temporal_workflow_id, case_id=case_id)
-
-@router.post("/cases/{case_id}/users")
-async def add_case_user(
-    case_id: int,
-    payload: AssignCaseUserRequest,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
-    actor_user_id: UUID = Depends(get_request_user_id),
-):
-    # No email addresses in the logs.
-    logger.info("Received request to add a user to case %s", case_id)
-    resolved_user_id = await resolve_user_id_by_email(payload.email)
-
-    new_access = await create_case_user_access(
-        db=db,
-        case_id=case_id,
-        user_id=resolved_user_id,
-        actor_user_id=actor_user_id,
-        case_role=payload.case_role,
-        can_view=payload.can_view,
-        can_update=payload.can_update,
-        can_delete=payload.can_delete,
-        can_assign_users=payload.can_assign_users,
-    )
-
-    return {
-        "id": new_access.id,
-        "case_id": new_access.case_id,
-        "user_id": new_access.user_id,
-        "case_role": new_access.case_role,
-        "is_owner": new_access.is_owner,
-        "can_view": new_access.can_view,
-        "can_update": new_access.can_update,
-        "can_delete": new_access.can_delete,
-        "can_assign_users": new_access.can_assign_users,
-    }
-
-
-@router.get("/cases/{case_id}/users")
-async def list_case_users(
-    case_id: int,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_view")),
-):
-    result = await db.execute(
-        select(CaseUserAccess).where(
-            CaseUserAccess.case_id == case_id,
-        )
-    )
-
-    users = result.scalars().all()
-
-    return [
-        {
-            "id": user_access.id,
-            "case_id": user_access.case_id,
-            "user_id": user_access.user_id,
-            "case_role": user_access.case_role,
-            "is_owner": user_access.is_owner,
-            "can_view": user_access.can_view,
-            "can_update": user_access.can_update,
-            "can_delete": user_access.can_delete,
-            "can_assign_users": user_access.can_assign_users,
-        }
-        for user_access in users
-        ]
-
-
-@router.patch("/cases/{case_id}/users/{user_id}")
-async def update_case_user(
-    case_id: int,
-    user_id: UUID,
-    payload: UpdateCaseUserAccessRequest,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
-    actor_user_id: UUID = Depends(get_request_user_id),
-):
-    updated_access = await update_case_user_access(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-        actor_user_id=actor_user_id,
-        case_role=payload.case_role,
-        can_view=payload.can_view,
-        can_update=payload.can_update,
-        can_delete=payload.can_delete,
-        can_assign_users=payload.can_assign_users,
-    )
-
-    return {
-        "id": updated_access.id,
-        "case_id": updated_access.case_id,
-        "user_id": updated_access.user_id,
-        "case_role": updated_access.case_role,
-        "is_owner": updated_access.is_owner,
-        "can_view": updated_access.can_view,
-        "can_update": updated_access.can_update,
-        "can_delete": updated_access.can_delete,
-        "can_assign_users": updated_access.can_assign_users,
-    }
-
-@router.delete("/cases/{case_id}/users/{user_id}", status_code=204)
-async def remove_case_user(
-    case_id: int,
-    user_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
-    actor_user_id: UUID = Depends(get_request_user_id),
-):
-    await delete_case_user_access(
-        db=db,
-        case_id=case_id,
-        user_id=user_id,
-        actor_user_id=actor_user_id,
-    )
-
-@router.get("/cases/{case_id}/access-audit")
-async def list_case_access_audit(
-    case_id: int,
-    db: AsyncSession = Depends(get_db),
-    access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
-):
-    result = await db.execute(
-        select(CaseAccessAuditLog)
-        .where(CaseAccessAuditLog.case_id == case_id)
-        .order_by(CaseAccessAuditLog.created_at.desc())
-    )
-
-    logs = result.scalars().all()
-
-    return [
-        {
-            "id": log.id,
-            "case_id": log.case_id,
-            "actor_user_id": log.actor_user_id,
-            "target_user_id": log.target_user_id,
-            "action": log.action,
-            "details": log.details,
-            "created_at": log.created_at,
-        }
-        for log in logs
-    ]
-
-

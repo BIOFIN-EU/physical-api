@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import account, status, case_workflow, lookups, intermediaries, support, risk, bng, semantic
+from app.routers import account, project_access, status, case_workflow, lookups, intermediaries, support, risk, bng, semantic
 
 
 api_router = APIRouter()
@@ -13,6 +13,10 @@ api_router.include_router(status.router,
 api_router.include_router(case_workflow.router,
                           prefix=f"{std_prefix}/case_workflow",
                           tags=["Case Workflow"])
+
+api_router.include_router(project_access.router,
+                          prefix=f"{std_prefix}/case_workflow",
+                          tags=["Project access"])
 
 
 api_router.include_router(lookups.router,
