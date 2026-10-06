@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.routers import status, case_workflow, lookups, intermediaries, support, risk, bng, semantic
+from app.routers import account, status, case_workflow, lookups, intermediaries, support, risk, bng, semantic
 
 
 api_router = APIRouter()
@@ -40,3 +40,7 @@ api_router.include_router(bng.router,
 api_router.include_router(semantic.router,
                           prefix=f"{std_prefix}/semantic",
                           tags=["Semantic export (JSON-LD)"])
+
+api_router.include_router(account.router,
+                          prefix=f"{std_prefix}/account",
+                          tags=["Account"])

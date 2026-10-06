@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     AUTH_CLIENT_ID: str = "api_physical"
     AUTH_CLIENT_SECRET: str
 
+    # Shared with the gateway, which sends it on every request (X-Internal-
+    # Secret). Requests without it are refused, so only the gateway can call
+    # this API and vouch for the user (X-User-Id). Unset: every request is
+    # refused. Also sent on risk framework calls (made by the worker).
+    INTERNAL_API_SECRET: str | None = None
+
     #todo fix this
     # JSON-LD export (app/semantic): IRIs are https://ontology.<env>.biofindashboard.eu/...
     SEMANTIC_ENV: Literal["dev", "prd"] = "dev"

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 async def resolve_user_id_by_email(email: str) -> UUID:
     async with httpx.AsyncClient(timeout=10.0) as client:
 
-        logger.info(f"Resolving user ID for email: {email}")
+        logger.info("Resolving user ID for an email address")
         response = await client.get(
             f"{settings.AUTH_URL}/api/auth/users/by-email",
             params={"email": email},
@@ -20,7 +20,7 @@ async def resolve_user_id_by_email(email: str) -> UUID:
                 "X-Client-Secret": settings.AUTH_CLIENT_SECRET,
             },
         )
-        logger.info(f"Received response from auth service: {response.status_code} - {response.text}")
+        logger.info("Received response from auth service: %s", response.status_code)
 
 
     if response.status_code == 404:

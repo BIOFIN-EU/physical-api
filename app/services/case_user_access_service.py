@@ -1,9 +1,19 @@
+import json
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.bng import BngCaseRole
 from app.models.case_data import Case, CaseUserAccess, CaseAccessAuditLog
+
+PERMISSION_FLAGS = ("can_view", "can_update", "can_delete", "can_assign_users")
+
+
+def access_summary(access: CaseUserAccess) -> dict:
+    """A member's access, as recorded in the audit log's details."""
+    return {"case_role": access.case_role, **{flag: getattr(access, flag) for flag in PERMISSION_FLAGS}}
+
 
 async def get_case_user_access(
         db: AsyncSession,
@@ -48,7 +58,10 @@ async def create_case_user_access(
     existing = result.scalar_one_or_none()
 
     if existing:
-        raise ValueError("User already has access to this case")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This user is already a member of the project.",
+        )
 
     access = CaseUserAccess(
         case_id=case_id,
@@ -69,6 +82,7 @@ async def create_case_user_access(
         actor_user_id=actor_user_id,
         target_user_id=user_id,
         action="user_added",
+        details=json.dumps(access_summary(access)),
     )
 
     await db.commit()
@@ -101,6 +115,15 @@ async def update_case_user_access(
             detail="User does not have access to this case",
         )
 
+    if access.is_owner:
+        # The owner always keeps full access (they can't be locked out).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The project owner's access can't be changed.",
+        )
+
+    before = access_summary(access)
+
     if case_role is not None:
         access.case_role = case_role
 
@@ -122,6 +145,7 @@ async def update_case_user_access(
         actor_user_id=actor_user_id,
         target_user_id=user_id,
         action="user_access_updated",
+        details=json.dumps({"before": before, "after": access_summary(access)}),
     )
 
     await db.commit()
@@ -160,8 +184,11 @@ async def delete_case_user_access(
         actor_user_id=actor_user_id,
         target_user_id=user_id,
         action="user_removed",
+        details=json.dumps(access_summary(access)),
     )
 
+    # Their roles go with them (they would come back if re-added).
+    await db.execute(delete(BngCaseRole).where(BngCaseRole.case_id == case_id, BngCaseRole.user_id == user_id))
     await db.delete(access)
     await db.commit()
 
