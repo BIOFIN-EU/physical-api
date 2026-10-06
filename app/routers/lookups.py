@@ -47,7 +47,7 @@ async def get_lookup(
     # choice, e.g. ?nbs_environment_type_id=3 for interventions (see
     # app/services/nbs_links.py). The parameter is the parent field's name.
     for param, raw in (request.query_params.items() if request is not None else []):
-        if param == "intervention_id":
+        if param == "intermediary_id":  # handled above
             continue
         link = LOOKUP_FILTERS.get((lookup_key, param))
         if link is None:

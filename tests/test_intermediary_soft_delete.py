@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
+from starlette.requests import Request
 from temporalio.exceptions import ApplicationError
 
 from app.core.settings import settings
@@ -248,7 +249,13 @@ def test_function_lookup_filters_by_intermediary(intermediary_and_functions):
     intermediary_id, (fn_a, fn_b, fn_other) = intermediary_and_functions
 
     async def body(db):
-        filtered = {int(o["value"]) for o in await get_lookup("intermediary_function", db=db, intermediary_id=intermediary_id)}
+        # As the endpoint receives it: the parameter is in the request's query
+        # string too, which the linked-classification filters also read.
+        request = Request({"type": "http", "query_string": f"intermediary_id={intermediary_id}".encode(), "headers": []})
+        filtered = {
+            int(o["value"])
+            for o in await get_lookup("intermediary_function", db=db, intermediary_id=intermediary_id, request=request)
+        }
         everything = {int(o["value"]) for o in await get_lookup("intermediary_function", db=db, intermediary_id=None)}
         with pytest.raises(HTTPException) as exc:
             await get_lookup("country", db=db, intermediary_id=intermediary_id)
