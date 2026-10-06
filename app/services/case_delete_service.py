@@ -1,12 +1,19 @@
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from temporalio.client import Client
+from temporalio.service import RPCError, RPCStatusCode
+
+from app.core.settings import settings
 
 from app.models.case_data import Case, CaseUserAccess
 from app.models.workflow import CaseWorkflowRun
+
+logger = logging.getLogger(__name__)
 
 
 async def soft_delete_case(
@@ -65,3 +72,21 @@ async def soft_delete_case(
         return run.temporal_workflow_id
 
     return None
+
+
+async def stop_deleted_case_workflow(temporal_workflow_id: str, *, case_id: int) -> None:
+    """
+    Stop a deleted case's unfinished workflow, which would otherwise wait
+    forever for a step that can no longer be submitted. The case is already
+    deleted, so a failure is only logged.
+    """
+    try:
+        client = await Client.connect(settings.TEMPORAL_ADDRESS)
+        await client.get_workflow_handle(temporal_workflow_id).terminate(reason="Project deleted")
+    except RPCError as exc:
+        if exc.status != RPCStatusCode.NOT_FOUND:
+            logger.warning(
+                "Could not terminate workflow %s for deleted case %s: %s", temporal_workflow_id, case_id, exc
+            )
+    except Exception:
+        logger.exception("Could not terminate workflow %s for deleted case %s", temporal_workflow_id, case_id)

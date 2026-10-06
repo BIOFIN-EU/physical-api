@@ -25,6 +25,15 @@ def _risk_url(path: str) -> str:
     return f"{settings.RISK_URL.rstrip('/')}/{path}"
 
 
+def _risk_headers() -> dict[str, str]:
+    # When RISK_URL goes through a gateway (e.g. local development against
+    # the dev server), the gateway only lets signed-in users and internal
+    # services (with the shared secret) through.
+    if settings.INTERNAL_API_SECRET:
+        return {"X-Internal-Secret": settings.INTERNAL_API_SECRET}
+    return {}
+
+
 def _raise_for_response(exc: httpx.HTTPError, action: str) -> None:
     if isinstance(exc, httpx.HTTPStatusError):
         status_code = exc.response.status_code
@@ -49,6 +58,7 @@ def get_id_from_risk_framework(payload: LocationRiskInput) -> str:
         response = httpx.post(
             _risk_url("management-actions/priority/"),
             json=payload.model_dump(),
+            headers=_risk_headers(),
             timeout=settings.RISK_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -70,6 +80,7 @@ def get_risk_result(risk_id: str) -> dict[str, Any]:
     try:
         response = httpx.get(
             _risk_url(f"management-actions/get/{risk_id}/"),
+            headers=_risk_headers(),
             timeout=settings.RISK_TIMEOUT_SECONDS,
         )
         response.raise_for_status()

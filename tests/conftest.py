@@ -60,6 +60,7 @@ def _db_schema():
         with engine.begin() as conn:
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {settings.WORKFLOW_DB_SCHEMA}"))
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {settings.CASE_DATA_DB_SCHEMA}"))
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS support"))  # contact form (app.main imports it)
             Base.metadata.create_all(conn)
     except OperationalError as exc:
         pytest.skip(f"No reachable Postgres database for tests: {exc}")

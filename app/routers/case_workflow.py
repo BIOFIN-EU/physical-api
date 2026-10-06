@@ -28,7 +28,7 @@ from app.dependencies.case_access import require_case_permission
 from app.schemas.case_user_access import AssignCaseUserRequest, UpdateCaseUserAccessRequest
 from app.services.case_user_access_service import create_case_user_access, update_case_user_access, delete_case_user_access
 from app.services.auth_user_service import resolve_user_id_by_email
-from app.services.case_delete_service import soft_delete_case
+from app.services.case_delete_service import soft_delete_case, stop_deleted_case_workflow
 from app.workflows.actor import ACTOR_KEY
 from app.services.bng_roles import add_creator_role, authorize_step, is_rejection, record_signoff
 
@@ -710,30 +710,8 @@ async def delete_case(
     returns 404 for it. Deleting it again is a no-op.
     """
     temporal_workflow_id = await soft_delete_case(db, case_id=case_id, user_id=user_id)
-
-    # An unfinished workflow would otherwise wait forever for a step that can
-    # no longer be submitted. The case is already deleted at this point, so a
-    # failure here is only logged.
     if temporal_workflow_id:
-        try:
-            client = await Client.connect(settings.TEMPORAL_ADDRESS)
-            await client.get_workflow_handle(temporal_workflow_id).terminate(
-                reason="Project deleted"
-            )
-        except RPCError as exc:
-            if exc.status != RPCStatusCode.NOT_FOUND:
-                logger.warning(
-                    "Could not terminate workflow %s for deleted case %s: %s",
-                    temporal_workflow_id,
-                    case_id,
-                    exc,
-                )
-        except Exception:
-            logger.exception(
-                "Could not terminate workflow %s for deleted case %s",
-                temporal_workflow_id,
-                case_id,
-            )
+        await stop_deleted_case_workflow(temporal_workflow_id, case_id=case_id)
 
 @router.post("/cases/{case_id}/users")
 async def add_case_user(
@@ -743,10 +721,9 @@ async def add_case_user(
     access: CaseUserAccess = Depends(require_case_permission("can_assign_users")),
     actor_user_id: UUID = Depends(get_request_user_id),
 ):
-    payload_json = payload.json()
-    logger.info("Received request to add user to case %s with payload: %s", case_id, payload_json)
+    # No email addresses in the logs.
+    logger.info("Received request to add a user to case %s", case_id)
     resolved_user_id = await resolve_user_id_by_email(payload.email)
-    logging.info("Resolved email %s to user ID %s", payload.email, resolved_user_id)
 
     new_access = await create_case_user_access(
         db=db,
@@ -759,6 +736,18 @@ async def add_case_user(
         can_delete=payload.can_delete,
         can_assign_users=payload.can_assign_users,
     )
+
+    return {
+        "id": new_access.id,
+        "case_id": new_access.case_id,
+        "user_id": new_access.user_id,
+        "case_role": new_access.case_role,
+        "is_owner": new_access.is_owner,
+        "can_view": new_access.can_view,
+        "can_update": new_access.can_update,
+        "can_delete": new_access.can_delete,
+        "can_assign_users": new_access.can_assign_users,
+    }
 
 
 @router.get("/cases/{case_id}/users")

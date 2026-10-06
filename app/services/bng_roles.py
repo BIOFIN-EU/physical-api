@@ -32,7 +32,7 @@ from app.models.bng import (
 )
 from app.models.case_data import Case, CaseUserAccess
 from app.models.workflow import CaseWorkflowRun
-from app.services.case_user_access_service import update_case_user_access
+from app.services.case_user_access_service import create_case_access_audit_log, update_case_user_access
 from app.services.workflow_config_service import WorkflowConfigService, WorkflowNotFoundError
 
 # Payload keys set by the frontend. Removed before the payload reaches the
@@ -92,6 +92,17 @@ async def set_user_roles(
         raise HTTPException(status_code=404, detail="Add this user to the project before giving them BNG roles.")
 
     wanted = list(dict.fromkeys(roles))
+    held = await user_roles(db, case_id, user_id)
+    for role in sorted(held - set(wanted)):
+        await create_case_access_audit_log(
+            db, case_id=case_id, actor_user_id=actor_user_id, target_user_id=user_id,
+            action="role_removed", details=role,
+        )
+    for role in [r for r in wanted if r not in held]:
+        await create_case_access_audit_log(
+            db, case_id=case_id, actor_user_id=actor_user_id, target_user_id=user_id,
+            action="role_assigned", details=role,
+        )
     await db.execute(
         delete(BngCaseRole).where(
             BngCaseRole.case_id == case_id,
