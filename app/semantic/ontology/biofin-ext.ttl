@@ -217,10 +217,14 @@ bfx:EcologistRole a owl:Class ;
   rdfs:label "Ecologist role"@en ;
   rdfs:comment "Assesses habitats and verifies monitoring reports."@en ;
   rdfs:subClassOf biofineu:Role .
+bfx:ResponsibleBodyRole a owl:Class ;
+  rdfs:label "Responsible body role"@en ;
+  rdfs:comment "Holds a conservation covenant securing habitats (a designated responsible body under the Environment Act 2021) and records its legal security."@en ;
+  rdfs:subClassOf biofineu:Role .
 
 bfx:roleClass a owl:AnnotationProperty ;
   rdfs:label "role class"@en ;
-  rdfs:comment "Links a BNG role concept to the role class it corresponds to (biofineu:LandOwnerRole, biofineu:FunderRole, biofineu:LocalGovernmentRole, bfx:DeveloperRole, bfx:EcologistRole)."@en .
+  rdfs:comment "Links a BNG role concept to the role class it corresponds to (biofineu:LandOwnerRole, biofineu:FunderRole, biofineu:LocalGovernmentRole, bfx:DeveloperRole, bfx:EcologistRole, bfx:ResponsibleBodyRole)."@en .
 
 # --- habitat parcels and the metric ---
 

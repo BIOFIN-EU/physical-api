@@ -18,7 +18,10 @@ from app.models.bng import (
     ACTIVE_ALLOCATION_STATUSES,
     BNG_ALLOCATION_STEP,
     BNG_CATEGORIES,
+    BNG_ELIGIBLE_FIELD,
+    BNG_FEASIBILITY_STEP,
     BNG_HABITAT_BANK_WORKFLOW,
+    BNG_MIN_MANAGEMENT_YEARS,
     BNG_PRICING_STEP,
     LOCKED_ALLOCATION_STATUSES,
     PERMISSION_GRANTED,
@@ -33,7 +36,14 @@ from app.models.bng import (
 )
 from app.models.case_data import Case
 from app.schemas.bng import HabitatParcelsStepInput, UnitAllocationStepInput
-from app.services.bng_finance import SHARE_FIELDS, prices_from_step, shares_error, shares_from_step, total_price
+from app.services.bng_finance import (
+    PRICE_FIELDS,
+    SHARE_FIELDS,
+    prices_from_step,
+    shares_error,
+    shares_from_step,
+    total_price,
+)
 from app.services.bng_metric import ParcelUnits, parcel_units, summarise
 from app.workflows.activities import (
     SessionLocal,
@@ -51,9 +61,7 @@ BNG_FORM_STEPS = (
     "site_registration",
     "feasibility",
     "baseline_metric",
-    "hmmp",
     "legal_security",
-    "gain_site_register",
     # Development
     "development_details",
     "mitigation_hierarchy",
@@ -62,8 +70,9 @@ BNG_FORM_STEPS = (
     "gain_condition",
     "commencement",
 )
-# unit_pricing, planning_permission and gain_plan_approval are form steps too,
-# with extra checks or changes to other records (see below).
+# hmmp, unit_pricing, gain_site_register, planning_permission and
+# gain_plan_approval are form steps too, with extra checks or changes to other
+# records (see below).
 
 _UNIT_COLUMN = {
     "area": "habitat_units",
@@ -282,6 +291,12 @@ def save_bng_offsite_allocation_step(case_id: int, data: dict) -> None:
     payload = _parse_pydantic(UnitAllocationStepInput, data)
     _log_activity_payload("save_bng_offsite_allocation_step", case_id, payload)
 
+    if not payload.allocations:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {"allocations": "Request units from at least one habitat bank."},
+        )
+
     bank_ids = [allocation.habitat_bank_case_id for allocation in payload.allocations]
     if len(bank_ids) != len(set(bank_ids)):
         _raise_validation_error(
@@ -395,6 +410,71 @@ def _check_revenue_shares(session, case_id: int, answers: dict) -> None:
         _raise_validation_error(
             "Please correct the highlighted fields.",
             {SHARE_FIELDS["landowner"]: error},
+        )
+
+
+def _missing_prices(session, case_id: int, answers: dict | None) -> dict[str, str]:
+    """
+    A price above 0 for every category the bank has units to sell (uplift
+    from its habitat design), as {price field: error}.
+    """
+    uplift, _ = _bank_totals(session, case_id)
+    prices = prices_from_step(answers)
+    return {
+        PRICE_FIELDS[category]: f"Enter a price above 0: the habitat bank has {category} units to sell."
+        for category in BNG_CATEGORIES
+        if uplift[category] > 0 and not (prices[category] or 0) > 0
+    }
+
+
+def _check_unit_pricing(session, case_id: int, answers: dict) -> None:
+    _check_revenue_shares(session, case_id, answers)
+    errors = _missing_prices(session, case_id, answers)
+    if errors:
+        _raise_validation_error("Please correct the highlighted fields.", errors)
+
+
+def _check_management_period(session, case_id: int, answers: dict) -> None:
+    """HMMP: habitats are managed and monitored for at least 30 years."""
+    try:
+        years = Decimal(str(answers.get("management_period_years")))
+    except (ArithmeticError, ValueError):
+        years = None
+    if years is None or not years.is_finite() or years < BNG_MIN_MANAGEMENT_YEARS:
+        _raise_validation_error(
+            "Please correct the highlighted fields.",
+            {"management_period_years": f"Enter at least {BNG_MIN_MANAGEMENT_YEARS} years."},
+        )
+
+
+def _step_answers(session, case_id: int, step_code: str) -> dict | None:
+    return session.execute(
+        select(BngStepData.data).where(BngStepData.case_id == case_id, BngStepData.step_code == step_code)
+    ).scalar_one_or_none()
+
+
+def _check_ready_to_register(session, case_id: int, answers: dict) -> None:
+    """
+    Gain site register (the bank's last step, after which it can sell
+    units): the site must be eligible for BNG, and still priced for every
+    category it has units to sell (the habitat design may have changed
+    since unit pricing was saved).
+    """
+    eligible = (_step_answers(session, case_id, BNG_FEASIBILITY_STEP) or {}).get(BNG_ELIGIBLE_FIELD)
+    if eligible != "Yes":
+        _raise_validation_error(
+            "This habitat bank can't be registered yet.",
+            {"register_reference": (
+                "Eligible for BNG must be Yes in the Feasibility & Additionality Assessment "
+                f"(it is {eligible or 'not answered'})."
+            )},
+        )
+    if _missing_prices(session, case_id, _step_answers(session, case_id, BNG_PRICING_STEP)):
+        _raise_validation_error(
+            "This habitat bank can't be registered yet.",
+            {"register_reference": (
+                "Unit Pricing needs a price above 0 for every kind of unit the habitat bank has to sell."
+            )},
         )
 
 
@@ -513,8 +593,14 @@ BNG_ACTIVITIES = {
     "save_bng_baseline_habitats_step": _make_habitat_parcels_activity("baseline"),
     "save_bng_proposed_habitats_step": _make_habitat_parcels_activity("proposed"),
     "save_bng_offsite_allocation_step": save_bng_offsite_allocation_step,
+    "save_bng_hmmp_step": _make_form_step_activity(
+        "hmmp", after_save=_check_management_period
+    ),
     "save_bng_unit_pricing_step": _make_form_step_activity(
-        "unit_pricing", after_save=_check_revenue_shares
+        "unit_pricing", after_save=_check_unit_pricing
+    ),
+    "save_bng_gain_site_register_step": _make_form_step_activity(
+        "gain_site_register", after_save=_check_ready_to_register
     ),
     "save_bng_planning_permission_step": _make_form_step_activity(
         "planning_permission", after_save=_allocate_on_permission

@@ -103,10 +103,8 @@ class IntermediaryAssignmentInput(BaseModel):
 
 
 class IntermediaryStepInput(BaseModel):
-    assignments: list[IntermediaryAssignmentInput] = Field(
-        ...,
-        min_length=1,
-    )
+    # Empty when no intermediary is involved (the step is optional).
+    assignments: list[IntermediaryAssignmentInput] = Field(default_factory=list)
 
 
 class LocationEntryInput(BaseModel):

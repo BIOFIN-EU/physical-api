@@ -393,8 +393,11 @@ def test_full_lifecycle_to_transaction_record(cases, reference):
     assert finances["potential_margin"] == 5000.0   # 8000 - 3000
 
     # Retired units can't be changed or released any more.
-    with pytest.raises(ApplicationError):
-        BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {"allocations": []})
+    with pytest.raises(ApplicationError) as exc:
+        BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {
+            "allocations": [{"habitat_bank_case_id": bank, "habitat_units": "10"}],
+        })
+    assert "already retired" in str(exc.value.details)
     with pytest.raises(HTTPException) as exc:
         _action(row.id, "release", _owner(development))
     assert exc.value.status_code == 409
@@ -668,6 +671,7 @@ def test_transactions_keep_the_revenue_split(cases, reference):
 
 def _registered_bank(cases, registration_date="2026-03-01") -> int:
     bank = cases(BNG_HABITAT_BANK_WORKFLOW, status="completed")
+    BNG_ACTIVITIES["save_bng_feasibility_step"](bank, {"bng_eligible": "Yes"})
     BNG_ACTIVITIES["save_bng_gain_site_register_step"](bank, {
         "register_reference": "BGS-1", "registration_date": registration_date,
     })
@@ -788,3 +792,67 @@ def test_accepting_without_permission_still_reserves(cases, reference):
     })
     BNG_ACTIVITIES["save_bng_planning_permission_step"](development, {"decision": "Refused"})
     assert _action(_allocation(development, bank).id, "accept", _owner(bank)) == "reserved"
+
+
+# ---------- rules the step help texts promise ----------
+
+def _errors(exc) -> dict:
+    return exc.value.details[0]
+
+
+def test_management_period_is_at_least_30_years(cases):
+    bank = cases(BNG_HABITAT_BANK_WORKFLOW)
+    for years in (29, "29.9", "", None, "abc", "NaN"):
+        with pytest.raises(ApplicationError) as exc:
+            BNG_ACTIVITIES["save_bng_hmmp_step"](bank, {"management_period_years": years})
+        assert "management_period_years" in _errors(exc)
+    BNG_ACTIVITIES["save_bng_hmmp_step"](bank, {"management_period_years": 30})
+    BNG_ACTIVITIES["save_bng_hmmp_step"](bank, {"management_period_years": "35"})
+
+
+def test_units_to_sell_need_a_price(cases, reference):
+    bank = _bank_with_uplift(cases, reference)   # area uplift only
+    shares = {"delivery_cost": "3000", "landowner_share_percent": 100,
+              "investor_share_percent": 0, "manager_share_percent": 0}
+    for price in (None, "", 0, "-5"):
+        with pytest.raises(ApplicationError) as exc:
+            BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {**shares, "price_per_habitat_unit": price})
+        assert set(_errors(exc)) == {"price_per_habitat_unit"}
+    # Categories with nothing to sell need no price.
+    BNG_ACTIVITIES["save_bng_unit_pricing_step"](bank, {**shares, "price_per_habitat_unit": "100"})
+
+
+def test_registering_needs_eligibility_and_prices(cases, reference):
+    bank = _priced_bank(cases, reference)
+    register = {"register_reference": "BGS-1", "registration_date": "2026-03-01"}
+
+    def refusal():
+        with pytest.raises(ApplicationError) as exc:
+            BNG_ACTIVITIES["save_bng_gain_site_register_step"](bank, dict(register))
+        return _errors(exc)["register_reference"]
+
+    assert "not answered" in refusal()
+    for answer in ("No", "Uncertain"):
+        BNG_ACTIVITIES["save_bng_feasibility_step"](bank, {"bng_eligible": answer})
+        assert f"(it is {answer})" in refusal()
+    BNG_ACTIVITIES["save_bng_feasibility_step"](bank, {"bng_eligible": "Yes"})
+
+    # The design changed after pricing: hedgerow units to sell, without a price.
+    BNG_ACTIVITIES["save_bng_proposed_habitats_step"](bank, {"parcels": [
+        _parcel(reference, "area", "10", "good"), _parcel(reference, "hedgerow", "1"),
+    ]})
+    assert "Unit Pricing" in refusal()
+
+    BNG_ACTIVITIES["save_bng_proposed_habitats_step"](bank, {"parcels": [_parcel(reference, "area", "10", "good")]})
+    BNG_ACTIVITIES["save_bng_gain_site_register_step"](bank, dict(register))
+    with SessionLocal() as session:
+        assert session.execute(
+            select(BngStepData).where(BngStepData.case_id == bank, BngStepData.step_code == "gain_site_register")
+        ).scalar_one().data["register_reference"] == "BGS-1"
+
+
+def test_off_site_step_needs_a_request(cases, reference):
+    development = _development_needing(cases, reference, 44)
+    with pytest.raises(ApplicationError) as exc:
+        BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {"allocations": []})
+    assert "at least one habitat bank" in _errors(exc)["allocations"]
