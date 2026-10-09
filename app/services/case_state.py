@@ -245,6 +245,7 @@ def serialize_document(row: CaseDocument) -> dict[str, Any]:
         "upload_token": row.upload_token,
         "content_type": row.content_type,
         "size_bytes": row.size_bytes,
+        "notes": row.notes,
         "created_at": to_json_value(row.created_at),
     }
 
