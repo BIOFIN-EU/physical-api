@@ -163,13 +163,24 @@ AUDIT_ACTION_LABELS = {
     "role_removed": "Role taken away",
     "ownership_transferred": "Became owner",
     "admin_viewed": "Viewed by an administrator",
+    "document_viewed": "Viewed a document",
+    "document_downloaded": "Downloaded a document",
 }
+DOCUMENT_ACTIONS = {"view": "document_viewed", "download": "document_downloaded"}
+# The same person opening the same file again within this time isn't
+# recorded again (a viewer reloading, a double click).
+DOCUMENT_REPEAT_WINDOW_MINUTES = 10
 
 
 def _audit_detail(action: str, details: str | None) -> str | None:
     """A short description of what changed."""
     if action in ("role_assigned", "role_removed"):
         return role_label(details)
+    if action in DOCUMENT_ACTIONS.values():
+        try:
+            return json.loads(details or "{}").get("file")
+        except (ValueError, AttributeError):
+            return None
     try:
         parsed = json.loads(details) if details else None
     except ValueError:
@@ -229,5 +240,34 @@ async def record_admin_view(db: AsyncSession, *, case_id: int, admin_id: UUID) -
     if recent is None:
         await create_case_access_audit_log(
             db, case_id=case_id, actor_user_id=admin_id, target_user_id=admin_id, action="admin_viewed",
+        )
+        await db.commit()
+
+
+async def record_document_access(
+    db: AsyncSession, *, case_id: int, user_id: UUID, document_id: int, filename: str, how: str,
+) -> None:
+    """
+    Someone viewed or downloaded one of the project's files (`how` is
+    "view" or "download"): recorded in its access history, once per
+    person, file and way within 10 minutes.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    action = DOCUMENT_ACTIONS[how]
+    details = json.dumps({"file": filename, "document_id": document_id})
+    since = datetime.now(timezone.utc) - timedelta(minutes=DOCUMENT_REPEAT_WINDOW_MINUTES)
+    recent = await db.scalar(
+        select(CaseAccessAuditLog.id).where(
+            CaseAccessAuditLog.case_id == case_id,
+            CaseAccessAuditLog.actor_user_id == user_id,
+            CaseAccessAuditLog.action == action,
+            CaseAccessAuditLog.details == details,
+            CaseAccessAuditLog.created_at >= since,
+        ).limit(1)
+    )
+    if recent is None:
+        await create_case_access_audit_log(
+            db, case_id=case_id, actor_user_id=user_id, target_user_id=user_id, action=action, details=details,
         )
         await db.commit()
