@@ -86,3 +86,9 @@
   skos:notation "lpa" ;
   skos:inScheme <{{BASE}}concept/bng-role> ;
   bfx:roleClass biofineu:LocalGovernmentRole .
+
+<{{BASE}}concept/bng-role/responsible_body> a skos:Concept ;
+  skos:prefLabel "Responsible Body"@en ;
+  skos:notation "responsible_body" ;
+  skos:inScheme <{{BASE}}concept/bng-role> ;
+  bfx:roleClass bfx:ResponsibleBodyRole .

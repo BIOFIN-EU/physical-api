@@ -51,6 +51,12 @@ BNG_WORKFLOWS = (BNG_HABITAT_BANK_WORKFLOW, BNG_DEVELOPMENT_WORKFLOW)
 BNG_ALLOCATION_STEP = "offsite_allocation"
 # Habitat bank step holding its unit prices and delivery cost.
 BNG_PRICING_STEP = "unit_pricing"
+# Habitat bank step concluding whether the site may supply units
+# (bng_eligible): only "Yes" lets the bank be registered (its last step).
+BNG_FEASIBILITY_STEP = "feasibility"
+BNG_ELIGIBLE_FIELD = "bng_eligible"
+# BNG requires habitats to be managed and monitored for at least 30 years.
+BNG_MIN_MANAGEMENT_YEARS = 30
 
 # Unit lifecycle of an allocation (Phase 2 marketplace):
 #   requested -> reserved (bank accepts) -> allocated (planning permission)

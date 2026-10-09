@@ -10,27 +10,31 @@
     },
     "intermediary": {
       "label": "Intermediary",
-      "description": "Supports the borrower, e.g. designing the transaction: can complete the financial and project steps with them."
+      "description": "Supports the borrower, for example by designing the transaction: can view the project."
     },
     "landowner": {
       "label": "Landowner / Habitat Bank",
-      "description": "Owns the site and runs the habitat bank: registers it, plans its management and decides on unit reservation requests."
+      "description": "Owns or operates the site: registers the habitat bank, plans its management, agrees unit pricing and decides on unit requests."
     },
     "investor": {
       "label": "Investor",
-      "description": "Invests in the habitat bank and shares its revenue: agrees unit pricing and decides on reservation requests with the landowner."
+      "description": "Invests in the habitat bank and shares its revenue: agrees unit pricing and revenue shares with the landowner, and decides on unit requests."
     },
     "developer": {
       "label": "Developer",
-      "description": "Builds the development and buys the units it needs: completes the development's steps and reserves off-site units."
+      "description": "Describes the development, requests off-site units when needed, submits the biodiversity gain plan and records commencement."
     },
     "ecologist": {
       "label": "Ecologist",
-      "description": "Surveys habitats, runs the biodiversity metric and verifies monitoring reports."
+      "description": "Surveys habitats, assesses ecological feasibility, prepares the baseline and proposed habitat assessments with the prototype metric, and verifies monitoring reports."
     },
     "lpa": {
       "label": "Local Planning Authority",
-      "description": "Approves legal security, planning permission and the biodiversity gain plan; verifies monitoring reports."
+      "description": "Reviews the on-site decision, approves legal security, planning permission and the biodiversity gain plan, sets the biodiversity gain condition, and verifies monitoring reports."
+    },
+    "responsible_body": {
+      "label": "Responsible Body",
+      "description": "Reviews and records legal security for a conservation covenant, including the signed agreement and responsible body details."
     }
   },
   "workflows": {
@@ -52,29 +56,30 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
             {
               "name": "disclaimer_text",
-              "display_name": "Disclaimer",
+              "display_name": "Data Collection and Sharing Notice",
               "type": "content",
-              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              "content": "The information recorded in this platform supports project assessment, nature-based solution development, financing, collaboration, monitoring, research and reporting for BIOFIN-EU.\n\nProject information is available to authorised participants assigned access to this project. Necessary information may also be processed for platform operation, administration, security and legal compliance.\n\nThe optional sharing setting below records whether you permit wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations. Leave it unchecked to decline this wider sharing. This choice is separate from access granted to authorised project participants and necessary platform processing.\n\nYou remain responsible for checking the completeness and accuracy of information you provide or rely on. Methodologies, indicators and platform functionality may change over time.\n\nThe required acknowledgement confirms that you have read and understood this notice; it does not grant permission for the optional wider sharing."
             },
             {
               "name": "disclaimer_acknowledged",
-              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
-              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "display_name": "I have read and understood the data collection and sharing notice.",
+              "help_text": "Required acknowledgement of the notice. Optional wider sharing is controlled separately below.",
               "type": "checkbox",
               "required": true
             },
             {
               "name": "allow_data_sharing",
-              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
-              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "display_name": "Allow wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations.",
+              "help_text": "Optional. Leave unchecked to decline wider sharing. This does not change access granted to authorised project participants or necessary platform processing.",
               "type": "checkbox",
-              "required": true
+              "required": false,
+              "default": false
             }
           ]
         },
@@ -83,10 +88,9 @@
           "activity": "save_basic_info_step",
           "next": "location",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -113,16 +117,16 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "location_table",
           "submit_mode": "json",
           "fields": [
             {
               "name": "locations",
               "display_name": "Locations",
-              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically, and each polygon is used to assess its biodiversity risk in the Vulnerability Index.",
+              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically. Polygons are used for area-based assessment in the Vulnerability Index; a point records a location without a site boundary.",
               "entry_help_text": {
-                "friendly_name": "A friendly name you choose for this location, such as “North field” or “Riverside plot”, so you can tell your sites apart when a project has several. It’s used to label the location on the project dashboard and in the Vulnerability Index."
+                "friendly_name": "A friendly name you choose for this location, such as \u201cNorth field\u201d or \u201cRiverside plot\u201d, so you can tell your sites apart when a project has several. It\u2019s used to label the location on the project page and in the Vulnerability Index."
               },
               "type": "location_table",
               "required": true
@@ -134,10 +138,9 @@
           "activity": "save_financial_step",
           "next": "identifiers",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -188,7 +191,7 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -229,16 +232,16 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "assignment_table",
           "submit_mode": "json",
           "fields": [
             {
               "name": "assignments",
               "display_name": "Intermediary Assignments",
-              "help_text": "The organisations supporting this project and the role each one plays. Add one row per intermediary and function; an intermediary can hold more than one function.",
+              "help_text": "Optional. Add the organisations supporting this project and the function each performs. An intermediary can hold more than one function. Leave empty if no intermediary is involved. Adding an organisation here doesn't give its staff access to the project: invite them in the Access tab.",
               "type": "assignment_table",
-              "required": true,
+              "required": false,
               "row_fields": [
                 {
                   "name": "intermediary_id",
@@ -281,29 +284,30 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
             {
               "name": "disclaimer_text",
-              "display_name": "Disclaimer",
+              "display_name": "Data Collection and Sharing Notice",
               "type": "content",
-              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              "content": "The information recorded in this platform supports project assessment, nature-based solution development, financing, collaboration, monitoring, research and reporting for BIOFIN-EU.\n\nProject information is available to authorised participants assigned access to this project. Necessary information may also be processed for platform operation, administration, security and legal compliance.\n\nThe optional sharing setting below records whether you permit wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations. Leave it unchecked to decline this wider sharing. This choice is separate from access granted to authorised project participants and necessary platform processing.\n\nYou remain responsible for checking the completeness and accuracy of information you provide or rely on. Methodologies, indicators and platform functionality may change over time.\n\nThe required acknowledgement confirms that you have read and understood this notice; it does not grant permission for the optional wider sharing."
             },
             {
               "name": "disclaimer_acknowledged",
-              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
-              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "display_name": "I have read and understood the data collection and sharing notice.",
+              "help_text": "Required acknowledgement of the notice. Optional wider sharing is controlled separately below.",
               "type": "checkbox",
               "required": true
             },
             {
               "name": "allow_data_sharing",
-              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
-              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "display_name": "Allow wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations.",
+              "help_text": "Optional. Leave unchecked to decline wider sharing. This does not change access granted to authorised project participants or necessary platform processing.",
               "type": "checkbox",
-              "required": true
+              "required": false,
+              "default": false
             }
           ]
         },
@@ -314,13 +318,13 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
             {
               "name": "name",
-              "display_name": "Name",
+              "display_name": "Project Name",
               "help_text": "A short name that identifies this project across the platform, for example in the project list.",
               "type": "text",
               "required": true
@@ -339,10 +343,9 @@
           "activity": "save_financing_type_step",
           "next": "location",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -364,16 +367,16 @@
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "location_table",
           "submit_mode": "json",
           "fields": [
             {
               "name": "locations",
               "display_name": "Locations",
-              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically, and each polygon is used to assess its biodiversity risk in the Vulnerability Index.",
+              "help_text": "The site(s) the project covers. Draw each site as a polygon on the map, or enter a point. The country is detected automatically. Polygons are used for area-based assessment in the Vulnerability Index; a point records a location without a site boundary.",
               "entry_help_text": {
-                "friendly_name": "A friendly name you choose for this location, such as “North field” or “Riverside plot”, so you can tell your sites apart when a project has several. It’s used to label the location on the project dashboard and in the Vulnerability Index."
+                "friendly_name": "A friendly name you choose for this location, such as \u201cNorth field\u201d or \u201cRiverside plot\u201d, so you can tell your sites apart when a project has several. It\u2019s used to label the location on the project page and in the Vulnerability Index."
               },
               "type": "location_table",
               "required": true
@@ -385,17 +388,16 @@
           "activity": "save_nature_based_solution_step",
           "next": "funding_requirements",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
             {
               "name": "nbs_environment_type_id",
               "display_name": "NbS Environment Type",
-              "help_text": "The type of ecosystem the solution is in, for example cropland, forest, grassland, wetland, rivers and lakes, coastal or urban. Choose Multiple when it spans several.",
+              "help_text": "The type of ecosystem the solution is in, for example cropland, forest, grassland, wetland, rivers and lakes, coastal or urban. Choose Multiple when it spans several, and describe the environments and interventions in NbS Description.",
               "describe_options": true,
               "type": "select",
               "required": false,
@@ -404,7 +406,7 @@
             {
               "name": "nbs_intervention_type_id",
               "display_name": "NbS Intervention Type",
-              "help_text": "The specific kind of intervention, for example protecting and conserving ecosystems, managing agricultural landscapes or restoring degraded ecosystems. Only interventions that fit the environment are offered, grouped by type: 1, better use of existing natural ecosystems; 2, managed or restored ecosystems; 3, new ecosystems.",
+              "help_text": "The specific kind of intervention, for example protecting and conserving ecosystems, managing agricultural landscapes or restoring degraded ecosystems. Only interventions that fit the environment are offered, grouped by type: 1, better use of existing natural ecosystems; 2, managed or restored ecosystems; 3, new ecosystems. Select an environment first; for Multiple, describe any additional interventions in NbS Description.",
               "describe_options": true,
               "type": "select",
               "required": false,
@@ -454,10 +456,9 @@
           "activity": "save_funding_requirements_step",
           "next": "investment_rationale",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -487,28 +488,28 @@
             {
               "name": "maintenance_costs",
               "display_name": "Maintenance Costs",
-              "help_text": "Ongoing costs to keep the solution working over time, such as monitoring, upkeep and management.",
+              "help_text": "The total ongoing costs over the funding period, such as monitoring, upkeep and management. State the period in Funding Notes; enter an annual amount only if the funding period is one year.",
               "type": "number",
               "required": false
             },
             {
               "name": "direct_funding_amount",
               "display_name": "Direct Funding",
-              "help_text": "Funding that goes directly to the project. Direct plus indirect funding must add up to the funding amount.",
+              "help_text": "Funding that goes directly to the project. Direct plus indirect funding must add up to the funding amount. Enter 0 if none.",
               "type": "number",
-              "required": false
+              "required": true
             },
             {
               "name": "indirect_funding_amount",
               "display_name": "Indirect Funding",
-              "help_text": "Funding that supports the project indirectly, for example through partners or linked programmes. Direct plus indirect funding must add up to the funding amount.",
+              "help_text": "Funding that supports the project indirectly, for example through partners or linked programmes. Direct plus indirect funding must add up to the funding amount. Enter 0 if none.",
               "type": "number",
-              "required": false
+              "required": true
             },
             {
               "name": "funding_notes",
               "display_name": "Funding Notes",
-              "help_text": "Anything else about the funding needs, such as timing, phasing or conditions.",
+              "help_text": "Explain the funding period, timing, phasing and any conditions, including the period the maintenance costs cover.",
               "type": "textarea",
               "required": false
             }
@@ -519,10 +520,9 @@
           "activity": "save_investment_rationale_step",
           "next": "supporting_document",
           "roles": [
-            "borrower",
-            "intermediary"
+            "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -550,19 +550,19 @@
           ]
         },
         "supporting_document": {
-          "title": "Supporting document",
+          "title": "Supporting Document",
           "activity": "save_supporting_document_step",
           "next": null,
           "roles": [
             "borrower"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "ui_mode": "file_form",
           "submit_mode": "multipart",
           "fields": [
             {
               "name": "supporting_document",
-              "display_name": "Supporting documents, proof of meeting standards",
+              "display_name": "Supporting Document",
               "help_text": "Upload evidence that supports the application, such as certificates, surveys, plans or proof of meeting relevant standards.",
               "type": "file",
               "required": true
@@ -586,7 +586,8 @@
         "landowner",
         "investor",
         "ecologist",
-        "lpa"
+        "lpa",
+        "responsible_body"
       ],
       "creator_role": "landowner",
       "steps": {
@@ -599,23 +600,24 @@
           "fields": [
             {
               "name": "disclaimer_text",
-              "display_name": "Disclaimer",
+              "display_name": "Data Collection and Sharing Notice",
               "type": "content",
-              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              "content": "The information recorded in this platform supports project assessment, nature-based solution development, financing, collaboration, monitoring, research and reporting for BIOFIN-EU.\n\nProject information is available to authorised participants assigned access to this project. Necessary information may also be processed for platform operation, administration, security and legal compliance.\n\nThe optional sharing setting below records whether you permit wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations. Leave it unchecked to decline this wider sharing. This choice is separate from access granted to authorised project participants and necessary platform processing.\n\nYou remain responsible for checking the completeness and accuracy of information you provide or rely on. Methodologies, indicators and platform functionality may change over time. This pathway uses a simplified prototype biodiversity metric and does not establish statutory compliance.\n\nThe required acknowledgement confirms that you have read and understood this notice; it does not grant permission for the optional wider sharing."
             },
             {
               "name": "disclaimer_acknowledged",
-              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
-              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "display_name": "I have read and understood the data collection and sharing notice.",
+              "help_text": "Required acknowledgement of the notice. Optional wider sharing is controlled separately below.",
               "type": "checkbox",
               "required": true
             },
             {
               "name": "allow_data_sharing",
-              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
-              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "display_name": "Allow wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations.",
+              "help_text": "Optional. Leave unchecked to decline wider sharing. This does not change access granted to authorised project participants or necessary platform processing.",
               "type": "checkbox",
-              "required": true
+              "required": false,
+              "default": false
             }
           ],
           "stage": "Habitat Bank / Landowner",
@@ -623,7 +625,7 @@
           "roles": [
             "landowner"
           ],
-          "allow_on_behalf": true
+          "allow_on_behalf": false
         },
         "basic_info": {
           "title": "Habitat Bank Name and Description",
@@ -701,7 +703,7 @@
             {
               "name": "supply_role",
               "display_name": "BNG Supply Role",
-              "help_text": "How this site will supply biodiversity units.",
+              "help_text": "How this site will supply biodiversity units. The choice doesn't change the remaining registration steps.",
               "type": "select",
               "required": true,
               "options": [
@@ -746,7 +748,7 @@
               "display_name": "Locations",
               "help_text": "The boundary of the land being registered as a habitat bank. Draw it as one or more polygons on the map.",
               "entry_help_text": {
-                "friendly_name": "A friendly name you choose for this area, such as “North field”, so you can tell several areas apart."
+                "friendly_name": "A friendly name you choose for this area, such as \u201cNorth field\u201d, so you can tell several areas apart."
               },
               "type": "location_table",
               "required": true
@@ -760,7 +762,7 @@
         "feasibility": {
           "title": "Feasibility & Additionality Assessment",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Habitat Bank / Ecologist",
+          "actor": "Landowner / Habitat Bank, Ecologist",
           "activity": "save_bng_feasibility_step",
           "next": "baseline_habitats",
           "ui_mode": "form",
@@ -790,14 +792,14 @@
             {
               "name": "commercial_viability",
               "display_name": "Commercial Viability",
-              "help_text": "Whether selling units is likely to cover the costs of creating and managing the habitats for 30 years.",
+              "help_text": "Whether selling units is likely to cover the costs of creating and managing the habitats over the management period (set in the Habitat Management & Monitoring Plan).",
               "type": "textarea",
               "required": false
             },
             {
               "name": "bng_eligible",
               "display_name": "Eligible for BNG",
-              "help_text": "Your conclusion on whether the site is suitable to supply BNG units.",
+              "help_text": "Your conclusion on whether the site is suitable to supply BNG units. The habitat bank can only be added to the biodiversity gain site register, and sell units, once this is Yes.",
               "type": "select",
               "required": true,
               "options": [
@@ -820,7 +822,7 @@
             "landowner",
             "ecologist"
           ],
-          "allow_on_behalf": true
+          "allow_on_behalf": false
         },
         "baseline_habitats": {
           "title": "Baseline Assessment",
@@ -870,7 +872,7 @@
         "habitat_design": {
           "title": "Habitat Design",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Ecologist / Designer",
+          "actor": "Ecologist",
           "activity": "save_bng_proposed_habitats_step",
           "next": "hmmp",
           "ui_mode": "habitat_table",
@@ -893,7 +895,7 @@
         "hmmp": {
           "title": "Habitat Management & Monitoring Plan",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Habitat Bank",
+          "actor": "Landowner / Habitat Bank",
           "activity": "save_bng_hmmp_step",
           "next": "unit_pricing",
           "ui_mode": "form",
@@ -902,7 +904,7 @@
             {
               "name": "management_period_years",
               "display_name": "Management Period (years)",
-              "help_text": "How long the habitats will be managed and monitored. BNG requires at least 30 years.",
+              "help_text": "How long the habitats will be managed and monitored: at least 30 years.",
               "type": "number",
               "required": true
             },
@@ -941,7 +943,7 @@
             {
               "name": "reporting_obligations",
               "display_name": "Reporting Obligations",
-              "help_text": "What will be reported, to whom and when.",
+              "help_text": "What will be reported, to whom and when. If Monitoring Frequency is Other, give the monitoring schedule here.",
               "type": "textarea",
               "required": false
             }
@@ -954,7 +956,7 @@
         "unit_pricing": {
           "title": "Unit Pricing",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Habitat Bank / Investor",
+          "actor": "Landowner / Habitat Bank, Investor",
           "activity": "save_bng_unit_pricing_step",
           "next": "legal_security",
           "ui_mode": "form",
@@ -963,28 +965,28 @@
             {
               "name": "price_per_habitat_unit",
               "display_name": "Price per Habitat Unit (GBP)",
-              "help_text": "What a development pays for one area habitat unit from this habitat bank.",
+              "help_text": "The price in GBP for one area habitat unit. Required if the habitat bank has area habitat units to sell; otherwise leave empty.",
               "type": "number",
-              "required": true
+              "required": false
             },
             {
               "name": "price_per_hedgerow_unit",
               "display_name": "Price per Hedgerow Unit (GBP)",
-              "help_text": "What a development pays for one hedgerow unit. Leave empty if the bank has no hedgerow uplift.",
+              "help_text": "The price in GBP for one hedgerow unit. Required if the habitat bank has hedgerow units to sell; otherwise leave empty.",
               "type": "number",
               "required": false
             },
             {
               "name": "price_per_watercourse_unit",
               "display_name": "Price per Watercourse Unit (GBP)",
-              "help_text": "What a development pays for one watercourse unit. Leave empty if the bank has no watercourse uplift.",
+              "help_text": "The price in GBP for one watercourse unit. Required if the habitat bank has watercourse units to sell; otherwise leave empty.",
               "type": "number",
               "required": false
             },
             {
               "name": "delivery_cost",
-              "display_name": "Delivery Cost, 30 years (GBP)",
-              "help_text": "The expected total cost of creating the habitats and managing and monitoring them for 30 years. Used to compare against the revenue from selling units.",
+              "display_name": "Delivery Cost over Management Period (GBP)",
+              "help_text": "The expected total cost of creating the habitats and managing and monitoring them over the management period set in the Habitat Management & Monitoring Plan. Used to compare against the revenue from selling units.",
               "type": "number",
               "required": true
             },
@@ -1005,7 +1007,7 @@
             {
               "name": "manager_share_percent",
               "display_name": "Habitat Manager Share (%)",
-              "help_text": "The percentage for whoever manages and monitors the habitats for 30 years. Enter 0 if the landowner does this.",
+              "help_text": "The habitat manager's percentage of every sale, for managing and monitoring the habitats. Enter 0 if the landowner does this. The three shares must add up to 100%.",
               "type": "number",
               "required": true
             },
@@ -1024,9 +1026,9 @@
           "allow_on_behalf": true
         },
         "legal_security": {
-          "title": "Legal Security",
+          "title": "Legal Security Review",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Legal / LPA / Responsible Body",
+          "actor": "Local Planning Authority, Responsible Body",
           "activity": "save_bng_legal_security_step",
           "next": "gain_site_register",
           "ui_mode": "form",
@@ -1035,7 +1037,7 @@
             {
               "name": "agreement_type",
               "display_name": "Agreement Type",
-              "help_text": "The legal agreement that secures the habitats for at least 30 years.",
+              "help_text": "The legal agreement that secures the habitats for at least 30 years. A Section 106 agreement is usually held by the local planning authority, a conservation covenant by a responsible body.",
               "type": "select",
               "required": true,
               "options": [
@@ -1052,7 +1054,7 @@
             {
               "name": "agreement_reference",
               "display_name": "Agreement Reference",
-              "help_text": "The reference of the signed agreement.",
+              "help_text": "The reference of the signed Section 106 agreement or conservation covenant.",
               "type": "text",
               "required": true
             },
@@ -1061,20 +1063,21 @@
               "display_name": "Agreement Date",
               "help_text": "When the agreement was signed.",
               "type": "date",
-              "required": false
+              "required": true
             },
             {
               "name": "responsible_body",
               "display_name": "Responsible Body",
-              "help_text": "The local planning authority or responsible body that holds the agreement.",
+              "help_text": "The name of the local planning authority or responsible body that holds the agreement. Recording its name doesn't give that organisation access to the platform.",
               "type": "text",
               "required": false
             }
           ],
           "roles": [
-            "lpa"
+            "lpa",
+            "responsible_body"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "approval": {
             "reject_to": "hmmp",
             "reject_label": "Habitat Management & Monitoring Plan"
@@ -1083,7 +1086,7 @@
         "gain_site_register": {
           "title": "Biodiversity Gain Site Register",
           "stage": "Habitat Bank / Landowner",
-          "actor": "Habitat Bank / Platform",
+          "actor": "Landowner / Habitat Bank",
           "activity": "save_bng_gain_site_register_step",
           "next": null,
           "ui_mode": "form",
@@ -1101,7 +1104,7 @@
               "display_name": "Registration Date",
               "help_text": "When the site was added to the register.",
               "type": "date",
-              "required": false
+              "required": true
             },
             {
               "name": "register_notes",
@@ -1138,23 +1141,24 @@
           "fields": [
             {
               "name": "disclaimer_text",
-              "display_name": "Disclaimer",
+              "display_name": "Data Collection and Sharing Notice",
               "type": "content",
-              "content": "The information provided through this platform may be used to support biodiversity assessments, nature-based solution development, financing activities, stakeholder engagement, research, reporting, and other objectives related to BioFin-EU.\n\nProject information may be shared with authorised stakeholders, funding organisations, project partners, and other participants within the BioFin ecosystem where necessary to support project evaluation, collaboration, financing, monitoring, and reporting activities. Users may opt out of certain data-sharing activities by adjusting the settings below, although some information required for the operation, administration, security, and legal compliance of the platform may continue to be processed and retained.\n\nWhile reasonable efforts are made to ensure the accuracy and integrity of information contained within the platform, users remain responsible for verifying the completeness and correctness of any data they provide or rely upon. Information, methodologies, indicators, and platform functionality may be updated, revised, or enhanced over time.\n\nBy proceeding, you acknowledge that you have read and understood this notice and consent to the collection, processing, storage, and use of your information in accordance with the BIOFIN platform's operational requirements and applicable data protection regulations."
+              "content": "The information recorded in this platform supports project assessment, nature-based solution development, financing, collaboration, monitoring, research and reporting for BIOFIN-EU.\n\nProject information is available to authorised participants assigned access to this project. Necessary information may also be processed for platform operation, administration, security and legal compliance.\n\nThe optional sharing setting below records whether you permit wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations. Leave it unchecked to decline this wider sharing. This choice is separate from access granted to authorised project participants and necessary platform processing.\n\nYou remain responsible for checking the completeness and accuracy of information you provide or rely on. Methodologies, indicators and platform functionality may change over time. This pathway uses a simplified prototype biodiversity metric and does not establish statutory compliance.\n\nThe required acknowledgement confirms that you have read and understood this notice; it does not grant permission for the optional wider sharing."
             },
             {
               "name": "disclaimer_acknowledged",
-              "display_name": "I have read and understood the disclaimer and consent to the collection and processing of information as described above.",
-              "help_text": "Confirms you have read the disclaimer above and agree to your information being collected and processed as it describes.",
+              "display_name": "I have read and understood the data collection and sharing notice.",
+              "help_text": "Required acknowledgement of the notice. Optional wider sharing is controlled separately below.",
               "type": "checkbox",
               "required": true
             },
             {
               "name": "allow_data_sharing",
-              "display_name": "Allow my project information to be shared with relevant BioFin stakeholders, project partners, and potential funding organisations.",
-              "help_text": "Lets BioFin share this project's information with relevant stakeholders, project partners and potential funding organisations, as described in the disclaimer.",
+              "display_name": "Allow wider sharing of this project's information with relevant BIOFIN-EU stakeholders, project partners and potential funding organisations.",
+              "help_text": "Optional. Leave unchecked to decline wider sharing. This does not change access granted to authorised project participants or necessary platform processing.",
               "type": "checkbox",
-              "required": true
+              "required": false,
+              "default": false
             }
           ],
           "stage": "Developer / Planning",
@@ -1162,7 +1166,7 @@
           "roles": [
             "developer"
           ],
-          "allow_on_behalf": true
+          "allow_on_behalf": false
         },
         "basic_info": {
           "title": "Development Name and Description",
@@ -1237,13 +1241,6 @@
                   "label": "Other"
                 }
               ]
-            },
-            {
-              "name": "planning_reference",
-              "display_name": "Planning Reference",
-              "help_text": "The planning application reference, if one exists yet.",
-              "type": "text",
-              "required": false
             }
           ],
           "roles": [
@@ -1265,7 +1262,7 @@
               "display_name": "Locations",
               "help_text": "The boundary of the development site. Draw it as one or more polygons on the map.",
               "entry_help_text": {
-                "friendly_name": "A friendly name you choose for this area, such as “North field”, so you can tell several areas apart."
+                "friendly_name": "A friendly name you choose for this area, such as \u201cNorth field\u201d, so you can tell several areas apart."
               },
               "type": "location_table",
               "required": true
@@ -1279,7 +1276,7 @@
         "development_baseline": {
           "title": "Development Baseline Assessment",
           "stage": "Developer / Planning",
-          "actor": "Developer / Ecologist",
+          "actor": "Developer, Ecologist",
           "activity": "save_bng_baseline_habitats_step",
           "next": "development_proposal",
           "ui_mode": "habitat_table",
@@ -1326,7 +1323,7 @@
         "mitigation_hierarchy": {
           "title": "Mitigation Hierarchy Review",
           "stage": "Developer / Planning",
-          "actor": "Developer / Ecologist",
+          "actor": "Developer, Ecologist",
           "activity": "save_bng_mitigation_hierarchy_step",
           "next": "onsite_decision",
           "ui_mode": "form",
@@ -1370,7 +1367,7 @@
         "onsite_decision": {
           "title": "On-Site BNG Decision",
           "stage": "Developer / Planning",
-          "actor": "Developer / LPA",
+          "actor": "Developer, Local Planning Authority",
           "activity": "save_bng_onsite_decision_step",
           "next": "offsite_allocation",
           "ui_mode": "bng_metric",
@@ -1417,7 +1414,7 @@
         "offsite_allocation": {
           "title": "Off-Site Unit Reservation",
           "stage": "Developer / Planning",
-          "actor": "Developer / Platform",
+          "actor": "Developer",
           "activity": "save_bng_offsite_allocation_step",
           "next": "planning_application",
           "ui_mode": "bng_allocation",
@@ -1427,8 +1424,8 @@
               "name": "allocations",
               "display_name": "Off-site units",
               "type": "bng_allocation",
-              "required": false,
-              "help_text": "Request units from registered habitat banks to cover the shortfall. The habitat bank accepts or declines each request; accepted units are reserved for this development, become allocated when planning permission is granted, and are retired when the gain plan is approved."
+              "required": true,
+              "help_text": "Request units from registered habitat banks to cover the shortfall: at least one request. The habitat bank accepts or declines each request. Accepted units are reserved for this development, become allocated when planning permission is granted, and are retired when the gain plan is approved."
             }
           ],
           "roles": [
@@ -1473,7 +1470,7 @@
           "allow_on_behalf": true
         },
         "planning_permission": {
-          "title": "Planning Permission Granted",
+          "title": "Planning Permission Decision",
           "stage": "Developer / Planning",
           "actor": "Local Planning Authority",
           "activity": "save_bng_planning_permission_step",
@@ -1516,7 +1513,7 @@
           "roles": [
             "lpa"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "approval": {
             "reject_to": "planning_application",
             "reject_label": "Planning Application"
@@ -1527,7 +1524,7 @@
           "stage": "Developer / Planning",
           "actor": "Local Planning Authority",
           "activity": "save_bng_gain_condition_step",
-          "next": "gain_plan_approval",
+          "next": "gain_plan_submission",
           "ui_mode": "form",
           "submit_mode": "json",
           "fields": [
@@ -1549,6 +1546,36 @@
           "roles": [
             "lpa"
           ],
+          "allow_on_behalf": false
+        },
+        "gain_plan_submission": {
+          "title": "Biodiversity Gain Plan Submission",
+          "stage": "Developer / Planning",
+          "actor": "Developer, Ecologist",
+          "activity": "save_supporting_document_step",
+          "next": "gain_plan_approval",
+          "ui_mode": "file_form",
+          "submit_mode": "multipart",
+          "fields": [
+            {
+              "name": "supporting_document",
+              "display_name": "Biodiversity Gain Plan",
+              "help_text": "Upload the biodiversity gain plan for the Local Planning Authority to review. It should set out the on-site measures and any off-site allocations. The prototype assessment doesn't replace the Statutory Biodiversity Metric.",
+              "type": "file",
+              "required": true
+            },
+            {
+              "name": "document_notes",
+              "display_name": "Submission Notes",
+              "help_text": "Explain the plan, its version and supporting evidence, including any changes made after review.",
+              "type": "textarea",
+              "required": false
+            }
+          ],
+          "roles": [
+            "developer",
+            "ecologist"
+          ],
           "allow_on_behalf": true
         },
         "gain_plan_approval": {
@@ -1563,7 +1590,7 @@
             {
               "name": "gain_plan_reference",
               "display_name": "Gain Plan Reference",
-              "help_text": "The reference of the approved biodiversity gain plan. Approving it retires the allocated off-site units (they can never be used again) and creates a transaction record for each.",
+              "help_text": "The reference of the approved biodiversity gain plan. Approval needs the off-site shortfall fully covered by allocated units, then retires them so they can't be used again.",
               "type": "text",
               "required": true
             },
@@ -1585,10 +1612,10 @@
           "roles": [
             "lpa"
           ],
-          "allow_on_behalf": true,
+          "allow_on_behalf": false,
           "approval": {
-            "reject_to": "onsite_decision",
-            "reject_label": "On-Site BNG Decision"
+            "reject_to": "gain_plan_submission",
+            "reject_label": "Biodiversity Gain Plan Submission"
           }
         },
         "commencement": {

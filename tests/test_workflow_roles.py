@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.dependencies.case_access import require_case_permission
 from app.dependencies.gateway_identity import RequestIdentity
-from app.models.case_data import CaseAccessAuditLog, CaseUserAccess, CaseWorkflowRole
+from app.models.case_data import CaseAccessAuditLog, CaseIntermediary, CaseUserAccess, CaseWorkflowRole
 from app.services import project_members
 from app.services.access_levels import level_of
 from app.services.case_state import fetch_all_cases
@@ -27,7 +27,7 @@ from app.services.workflow_roles import (
     validate_role_config,
     workflow_roles,
 )
-from app.workflows.activities import SessionLocal
+from app.workflows.activities import SessionLocal, save_intermediary_step
 
 from tests.test_bng import cases  # noqa: F401 (fixture)
 from tests.test_case_soft_delete import _run
@@ -105,7 +105,8 @@ def test_each_pathway_offers_its_own_roles():
     financing = {r["code"]: r for r in workflow_roles(_config("private_lending_v1"))}
     assert list(financing) == ["borrower", "funder", "intermediary"]
     assert financing["funder"]["label"] == "Funder" and financing["funder"]["steps"] == []
-    assert {s["code"] for s in financing["intermediary"]["steps"]} == {"basic_info", "financial"}
+    # Only the borrower completes the financing steps, for now.
+    assert financing["intermediary"]["steps"] == []
 
 
 # ---------- financing pathways ----------
@@ -115,6 +116,7 @@ def test_financing_steps_follow_the_roles(cases, workflow):  # noqa: F811
     case_id = cases(workflow)
     steps = _config(workflow)["steps"]
     borrower, intermediary, funder = _member(case_id, "borrower"), _member(case_id, "intermediary"), _member(case_id, "funder")
+    manager = _member(case_id, "intermediary", level="manager")
 
     def may(user, step):
         try:
@@ -124,10 +126,22 @@ def test_financing_steps_follow_the_roles(cases, workflow):  # noqa: F811
             assert exc.status_code == 403
             return False
 
-    shared = "financial" if workflow == "private_lending_v1" else "funding_requirements"
-    assert may(borrower, "location") and may(borrower, shared)
-    assert may(intermediary, shared) and not may(intermediary, "location")
-    assert not may(funder, shared) and not may(funder, "location")
+    for step in steps:
+        assert may(borrower, step)
+        assert not may(intermediary, step) and not may(funder, step)
+    # Nor can a manager record a step on the borrower's behalf.
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: authorize_step(
+            db, access=_access(case_id, manager), step_config=steps["location"], payload={"_on_behalf": True},
+        ))
+    assert exc.value.detail["code"] == "role_required"
+
+
+def test_intermediaries_are_optional(cases):  # noqa: F811
+    case_id = cases("private_lending_v1")
+    save_intermediary_step(case_id, {"assignments": []})
+    with SessionLocal() as session:
+        assert session.execute(select(CaseIntermediary).where(CaseIntermediary.case_id == case_id)).first() is None
 
 
 # ---------- members ----------

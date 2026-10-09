@@ -79,7 +79,7 @@ def test_capacity_for_own_role_on_behalf_or_none():
 
 def test_vocabulary_labels_every_code():
     labels = vocabulary()
-    assert {r["code"] for r in labels["roles"]} == {"landowner", "investor", "developer", "ecologist", "lpa"}
+    assert {r["code"] for r in labels["roles"]} == {"landowner", "investor", "developer", "ecologist", "lpa", "responsible_body"}
     assert {c["code"]: c["size_unit"] for c in labels["categories"]} == {"area": "ha", "hedgerow": "km", "watercourse": "km"}
     assert labels["allocation_statuses"]["requested"] == "Requested"
     assert labels["monitoring_statuses"]["submitted"] == "Awaiting verification"
@@ -160,7 +160,12 @@ def test_my_capacities_per_step_and_action(cases):
     assert mine["allocations"]["kind"] == "own"                        # the developer releases
     assert mine["monitoring_submit"] is None and mine["monitoring_verify"] is None
 
-    assert steps(development, manager)["planning_permission"] == {"kind": "on_behalf", "role": "lpa", "roles": ["lpa"]}
+    # A manager may record the developer's steps on their behalf, but not
+    # the LPA's decisions (no allow_on_behalf).
+    assert steps(development, manager)["planning_application"] == {
+        "kind": "on_behalf", "role": "developer", "roles": ["developer"],
+    }
+    assert steps(development, manager)["planning_permission"] == {"kind": "none", "role": "lpa", "roles": ["lpa"]}
 
     bank = cases(BNG_HABITAT_BANK_WORKFLOW)
     ecologist = _member(bank, "ecologist")
