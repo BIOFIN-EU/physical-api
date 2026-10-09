@@ -1,9 +1,11 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
+from fastapi.responses import StreamingResponse
+from minio.error import S3Error
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
@@ -17,8 +19,10 @@ from app.models.workflow import CaseWorkflowRun
 from app.schemas.case_workflow import DetectCountryRequest
 from app.services.case_state import build_case_payload, get_case_workflow_config, fetch_cases
 from app.services.country_detection import build_geometry, detect_country_for_geometry
+from app.services.document_files import FILE_RESPONSE_HEADERS, UploadRejected, content_disposition, is_viewable
 from app.services.file_storage_service import store_upload
-from app.services.object_storage_service import get_presigned_download_url
+from app.services.object_storage_service import stream_object
+from app.services.project_members import record_document_access
 from app.services.workflow_config_service import WorkflowNotFoundError
 from app.services.workflow_runtime_service import WorkflowRuntimeService, WorkflowNotActiveError
 from app.services.case_step_edit_service import update_case_step_data
@@ -169,6 +173,7 @@ async def case_documents(db: AsyncSession, case_id: int) -> list[dict[str, Any]]
             "upload_token": doc.upload_token,
             "content_type": doc.content_type,
             "size_bytes": doc.size_bytes,
+            "viewable": is_viewable(doc.content_type),
             "notes": doc.notes,
             "created_at": doc.created_at,
         }
@@ -396,12 +401,22 @@ async def submit_file_step(
                 detail=f"Field '{field_name}' is not a file field",
             )
 
-        file_payload = await store_upload(
-            case_id=case_id,
-            current_step=current_step,
-            field_name=field_name,
-            upload=file,
-        )
+        try:
+            file_payload = await store_upload(
+                case_id=case_id,
+                current_step=current_step,
+                field_name=field_name,
+                upload=file,
+            )
+        except UploadRejected as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Validation failed",
+                    "current_step": current_step,
+                    "field_errors": {field_name: str(exc)},
+                },
+            )
 
         signal_payload = {
             "_step_code": current_step,
@@ -609,40 +624,53 @@ async def get_case_step_draft_endpoint(
     )
 
 
-@router.get("/cases/{case_id}/documents/{case_document_id}/download-url")
-async def get_document_download_url(
+@router.get("/cases/{case_id}/documents/{case_document_id}/content")
+async def get_document_content(
     case_id: int,
     case_document_id: int,
+    disposition: Literal["inline", "attachment"] = "attachment",
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_view")),
-) -> dict:
-    result = await db.execute(
+) -> StreamingResponse:
+    """
+    One of the project's files, for anyone who can view the project (checked
+    on every request; MinIO itself is never exposed). "inline" shows a PDF or
+    image in the browser; any other type is always a download of an opaque
+    type, so it can't run in the dashboard. Each view or download goes in the
+    project's access history.
+    """
+    document = await db.scalar(
         select(CaseDocument).where(
             CaseDocument.id == case_document_id,
             CaseDocument.case_id == case_id,
         )
     )
-    document = result.scalar_one_or_none()
-
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    download_url = get_presigned_download_url(
-        bucket_name=document.bucket_name,
-        object_key=document.object_key,
-        expires_seconds=3600,
+    inline = disposition == "inline" and is_viewable(document.content_type)
+    try:
+        chunks = stream_object(bucket_name=document.bucket_name, object_key=document.object_key)
+    except S3Error:
+        logger.exception("Stored file missing for document %s of case %s", document.id, case_id)
+        raise HTTPException(status_code=404, detail="The file is no longer available")
+
+    await record_document_access(
+        db, case_id=case_id, user_id=access.user_id, document_id=document.id,
+        filename=document.original_filename, how="view" if inline else "download",
     )
 
-    return {
-        "case_document_id": document.id,
-        "case_id": document.case_id,
-        "original_filename": document.original_filename,
-        "upload_token": document.upload_token,
-        "content_type": document.content_type,
-        "size_bytes": document.size_bytes,
-        "download_url": download_url,
-        "expires_in_seconds": 3600,
+    headers = {
+        **FILE_RESPONSE_HEADERS,
+        "Content-Disposition": content_disposition("inline" if inline else "attachment", document.original_filename),
     }
+    if document.size_bytes is not None:
+        headers["Content-Length"] = str(document.size_bytes)
+    return StreamingResponse(
+        chunks,
+        media_type=document.content_type if inline else "application/octet-stream",
+        headers=headers,
+    )
 
 
 @router.get("/cases/{case_id}/documents")

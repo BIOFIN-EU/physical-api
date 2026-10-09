@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from collections.abc import Iterator
 from io import BytesIO
 
 from minio import Minio
@@ -49,16 +49,21 @@ def upload_bytes(
     }
 
 
-def get_presigned_download_url(
-    *,
-    bucket_name: str,
-    object_key: str,
-    expires_seconds: int = 3600,
-) -> str:
+def stream_object(*, bucket_name: str, object_key: str, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+    """
+    The stored file's bytes, in chunks. MinIO stays private: files are only
+    served through the API, which checks the user's access first. The object
+    is opened here (so a missing file fails before any response is sent);
+    the connection is released once the chunks are read.
+    """
     client = get_minio_client()
+    response = client.get_object(bucket_name=bucket_name, object_name=object_key)
 
-    return client.presigned_get_object(
-        bucket_name=bucket_name,
-        object_name=object_key,
-        expires=timedelta(seconds=expires_seconds),
-    )
+    def chunks() -> Iterator[bytes]:
+        try:
+            yield from response.stream(chunk_size)
+        finally:
+            response.close()
+            response.release_conn()
+
+    return chunks()
