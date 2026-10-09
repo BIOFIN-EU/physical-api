@@ -3,7 +3,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import Client
@@ -154,6 +154,37 @@ async def start_case(
     }
 
 
+async def case_documents(db: AsyncSession, case_id: int) -> list[dict[str, Any]]:
+    """The case's uploaded documents, as the state and documents endpoints return them."""
+    result = await db.execute(
+        select(CaseDocument).where(CaseDocument.case_id == case_id)
+    )
+    return [
+        {
+            "case_document_id": doc.id,
+            "case_id": doc.case_id,
+            "step_code": doc.step_code,
+            "field_name": doc.field_name,
+            "original_filename": doc.original_filename,
+            "upload_token": doc.upload_token,
+            "content_type": doc.content_type,
+            "size_bytes": doc.size_bytes,
+            "notes": doc.notes,
+            "created_at": doc.created_at,
+        }
+        for doc in result.scalars().all()
+    ]
+
+
+async def with_documents(db: AsyncSession, case_id: int, state: dict[str, Any]) -> dict[str, Any]:
+    """
+    A workflow state with the case's documents, like GET /state. A submit
+    returns the next step's state and the page renders it directly, so it
+    must carry the documents too (a file step lists what's uploaded).
+    """
+    return {**state, "documents": await case_documents(db, case_id)}
+
+
 @router.get("/cases/{case_id}/state")
 async def get_case_state(
     case_id: int,
@@ -180,27 +211,7 @@ async def get_case_state(
         # Fall back to DB-backed state if Temporal workflow is already closed/unqueryable
         pass
 
-    result = await db.execute(
-        select(CaseDocument).where(CaseDocument.case_id == case_id)
-    )
-    documents = result.scalars().all()
-
-    workflow_state["documents"] = [
-        {
-            "case_document_id": doc.id,
-            "case_id": doc.case_id,
-            "step_code": doc.step_code,
-            "field_name": doc.field_name,
-            "original_filename": doc.original_filename,
-            "upload_token": doc.upload_token,
-            "content_type": doc.content_type,
-            "size_bytes": doc.size_bytes,
-            "created_at": doc.created_at,
-        }
-        for doc in documents
-    ]
-
-    return workflow_state
+    return await with_documents(db, case_id, workflow_state)
 
 
 @router.post("/cases/{case_id}/submit-json")
@@ -287,7 +298,7 @@ async def submit_step(
                 await record_signoff(db, case_id=case_id, step_code=current_step, user_id=access.user_id, capacity=capacity)
                 return {
                     "message": "Step submitted successfully",
-                    "state": state,
+                    "state": await with_documents(db, case_id, state),
                 }
 
             try:
@@ -316,12 +327,11 @@ async def submit_step(
                     case_id,
                     new_step,
                     new_status,
-                    state
                 )
                 await record_signoff(db, case_id=case_id, step_code=current_step, user_id=access.user_id, capacity=capacity)
                 return {
                     "message": "Step submitted successfully",
-                    "state": state,
+                    "state": await with_documents(db, case_id, state),
                 }
 
         try:
@@ -346,6 +356,8 @@ async def submit_file_step(
     case_id: int,
     field_name: str,
     file: UploadFile = File(...),
+    # The step's other answers (the file steps' document_notes).
+    document_notes: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_update")),
 ) -> dict:
@@ -395,6 +407,7 @@ async def submit_file_step(
             "_step_code": current_step,
             "_field_name": field_name,
             field_name: file_payload,
+            "document_notes": (document_notes or "").strip() or None,
             ACTOR_KEY: str(access.user_id),
         }
 
@@ -433,7 +446,7 @@ async def submit_file_step(
 
                 return {
                     "message": "File step submitted successfully",
-                    "state": state,
+                    "state": await with_documents(db, case_id, state),
                 }
 
             try:
@@ -458,7 +471,7 @@ async def submit_file_step(
             if new_step != current_step or new_status != before_status:
                 return {
                     "message": "File step submitted successfully",
-                    "state": state,
+                    "state": await with_documents(db, case_id, state),
                 }
 
         try:
@@ -638,25 +651,7 @@ async def list_case_documents(
     db: AsyncSession = Depends(get_db),
     access: CaseUserAccess = Depends(require_case_permission("can_view")),
 ) -> list[dict]:
-    result = await db.execute(
-        select(CaseDocument).where(CaseDocument.case_id == case_id)
-    )
-    documents = result.scalars().all()
-
-    return [
-        {
-            "case_document_id": doc.id,
-            "case_id": doc.case_id,
-            "step_code": doc.step_code,
-            "field_name": doc.field_name,
-            "original_filename": doc.original_filename,
-            "upload_token": doc.upload_token,
-            "content_type": doc.content_type,
-            "size_bytes": doc.size_bytes,
-            "created_at": doc.created_at,
-        }
-        for doc in documents
-    ]
+    return await case_documents(db, case_id)
 
 
 @router.get("/cases/{case_id}/data", response_model=dict[str, Any])
