@@ -114,8 +114,14 @@ async def delete_case_user_access(
     user_id: UUID,
     actor_user_id: UUID
 ) -> None:
-    """Remove a member and their roles (audited; committed)."""
+    """Remove a member and their roles (audited; committed). Nobody removes themselves."""
     access = await _member_or_404(db, case_id, user_id)
+
+    if user_id == actor_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can't remove yourself from the project. Ask the project owner or another manager.",
+        )
 
     if access.is_owner:
         raise HTTPException(
