@@ -18,12 +18,13 @@ from app.models.case_data import CaseAccessAuditLog, CaseIntermediary, CaseUserA
 from app.services import project_members
 from app.services.access_levels import level_of
 from app.services.case_state import fetch_all_cases
-from app.services.case_user_access_service import transfer_ownership
+from app.services.case_user_access_service import delete_case_user_access, transfer_ownership
 from app.services.project_members import add_member, change_member, mask_email, project_members as members_of
 from app.services.workflow_config_service import WorkflowConfigService
 from app.services.workflow_roles import (
     RoleConfigError,
     authorize_step,
+    user_roles,
     validate_role_config,
     workflow_roles,
 )
@@ -168,6 +169,49 @@ def test_adding_a_member_with_roles_makes_them_an_editor(cases, people):  # noqa
             roles=None, workflow_config=_config("private_lending_v1"),
         ))
     assert exc.value.status_code == 422
+
+
+def test_nobody_changes_their_own_level_or_removes_themselves(cases):  # noqa: F811
+    case_id = cases("use_case_2_v1")
+    owner = _member(case_id, "borrower", owner=True)
+    manager = _member(case_id, level="manager")
+    config = _config("use_case_2_v1")
+
+    def change(actor, user, **body):
+        return _run(lambda db: change_member(
+            db, case_id=case_id, actor=_access(case_id, actor), user_id=user,
+            level=body.get("level"), roles=body.get("roles"), workflow_config=config,
+        ))
+
+    # A manager lowering their own level would lose the right to undo it.
+    for level in ("editor", "viewer"):
+        with pytest.raises(HTTPException) as exc:
+            change(manager, manager, level=level)
+        assert exc.value.status_code == 403 and "own access level" in exc.value.detail
+    assert level_of(_access(case_id, manager)) == "manager"
+
+    # Their own roles they may change; resending their own level is no change.
+    change(manager, manager, level="manager", roles=["funder"])
+    assert _run(lambda db: user_roles(db, case_id, manager)) == {"funder"}
+
+    # Someone else may still change them, and they others.
+    change(owner, manager, level="editor")
+    assert level_of(_access(case_id, manager)) == "editor"
+    change(owner, manager, level="manager")
+    assert level_of(_access(case_id, manager)) == "manager"
+
+    # The owner's own rule is unchanged: their level stays.
+    with pytest.raises(HTTPException) as exc:
+        change(owner, owner, level="editor")
+    assert exc.value.status_code == 409
+
+    # Nobody removes themselves either.
+    with pytest.raises(HTTPException) as exc:
+        _run(lambda db: delete_case_user_access(db, case_id=case_id, user_id=manager, actor_user_id=manager))
+    assert exc.value.status_code == 403 and "remove yourself" in exc.value.detail
+    assert _access(case_id, manager) is not None
+    _run(lambda db: delete_case_user_access(db, case_id=case_id, user_id=manager, actor_user_id=owner))
+    assert _access(case_id, manager) is None
 
 
 def test_managers_see_emails_others_see_domains(cases, people):  # noqa: F811

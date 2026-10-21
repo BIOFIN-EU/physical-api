@@ -119,12 +119,18 @@ async def change_member(
     roles: list[str] | None,
     workflow_config: dict[str, Any],
 ) -> None:
-    """Change a member's level and/or roles (the owner keeps their level)."""
+    """
+    Change a member's level and/or roles (the owner keeps their level).
+    Nobody changes their own level: a manager who lowered it would lose the
+    right to put it back. Their own roles they may change.
+    """
     member = await db.scalar(
         select(CaseUserAccess).where(CaseUserAccess.case_id == case_id, CaseUserAccess.user_id == user_id)
     )
     if member is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This user isn't a member of the project.")
+    if user_id == actor.user_id and not member.is_owner and level is not None and level != level_of(member):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=SELF_LEVEL_CHANGE)
 
     if roles is not None:
         roles = await set_user_roles(
@@ -153,6 +159,9 @@ async def change_member(
     elif level is not None and level != "manager":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The project owner's access can't be changed.")
     await db.commit()
+
+
+SELF_LEVEL_CHANGE = "You can't change your own access level. Ask the project owner or another manager."
 
 
 AUDIT_ACTION_LABELS = {
