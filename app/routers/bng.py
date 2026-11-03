@@ -31,6 +31,7 @@ from app.services.bng_matching import (
     marketplace,
     user_developments,
 )
+from app.services.auth_user_service import lookup_users
 from app.services.case_user_access_service import get_case_user_access
 from app.services.bng_monitoring import (
     bank_reports,
@@ -39,6 +40,7 @@ from app.services.bng_monitoring import (
     submit_report,
     verify_report,
 )
+from app.services.project_members import person
 from app.services.workflow_config_service import WorkflowConfigService
 from app.services.workflow_roles import bng_capacities, case_roles, case_signoffs, user_roles
 from app.services.bng_payload import (
@@ -327,6 +329,16 @@ async def post_remedial_action_complete(
 # Phase 3: reporting (diagram step 32)
 # ---------------------------------------------------------
 
+async def _people_with_roles(db: AsyncSession, case_id: int, viewer: CaseUserAccess) -> list[dict[str, Any]]:
+    """Everyone with a role, shown as on the Access tab: full email for managers, masked for others."""
+    roles = await case_roles(db, case_id)
+    details = await lookup_users([UUID(user_id) for user_id in roles])
+    return [
+        {**person(user_id, details, full_email=bool(viewer.can_assign_users)), "roles": user_roles}
+        for user_id, user_roles in roles.items()
+    ]
+
+
 @router.get("/cases/{case_id}/report")
 async def get_case_report(
     case_id: int,
@@ -344,7 +356,7 @@ async def get_case_report(
         "allocations": await case_allocations(db, case),
         "transactions": await case_transactions(db, case),
         "signoffs": await case_signoffs(db, case.id),
-        "roles": await case_roles(db, case.id),
+        "people": await _people_with_roles(db, case.id, access),
         "step_titles": {
             code: step.get("title")
             for code, step in (WorkflowConfigService().get_workflow(case.case_type).get("steps") or {}).items()
