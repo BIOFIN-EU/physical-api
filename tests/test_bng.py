@@ -858,21 +858,35 @@ def test_off_site_step_needs_a_request(cases, reference):
     assert "at least one habitat bank" in _errors(exc)["allocations"]
 
 
-def test_case_report_for_development_and_bank(cases, reference):
-    from app.routers.bng import get_case_report
+def test_case_report_for_development_and_bank(cases, reference, monkeypatch):
+    from app.routers import bng as bng_router
 
     bank = _bank_with_uplift(cases, reference)
     development = cases(BNG_DEVELOPMENT_WORKFLOW, status="completed")
     BNG_ACTIVITIES["save_bng_baseline_habitats_step"](development, {"parcels": [_parcel(reference, "area", "5")]})
+    lpa = _member(development, "lpa", "landowner")
+    manager = _member(development, manager=True)
+    viewer = _member(development)
+
+    async def fake_lookup(user_ids):
+        return {str(lpa): {"email": "jane@lpa.gov.uk", "display_name": "Jane Smith"}}
+
+    monkeypatch.setattr(bng_router, "lookup_users", fake_lookup)
 
     async def body(db):
         return (
-            await get_case_report(development, db=db, access=None),
-            await get_case_report(bank, db=db, access=None),
+            await bng_router.get_case_report(development, db=db, access=_access(development, manager)),
+            await bng_router.get_case_report(development, db=db, access=_access(development, viewer)),
+            await bng_router.get_case_report(bank, db=db, access=_access(development, manager)),
         )
 
-    dev_report, bank_report = _run(body)
+    for_manager, for_viewer, bank_report = _run(body)
 
-    assert dev_report["case_type"] == BNG_DEVELOPMENT_WORKFLOW
-    assert "roles" in dev_report and "monitoring" not in dev_report
+    # People are shown as on the Access tab: full email for managers only.
+    assert for_manager["people"] == [{
+        "user_id": str(lpa), "display_name": "Jane Smith", "email": "jane@lpa.gov.uk",
+        "known": True, "roles": ["lpa", "landowner"],
+    }]
+    assert for_viewer["people"][0]["email"] == "j•••@lpa.gov.uk"
+    assert "monitoring" not in for_manager
     assert "financials" in bank_report and "monitoring" in bank_report
