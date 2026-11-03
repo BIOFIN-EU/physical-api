@@ -856,3 +856,23 @@ def test_off_site_step_needs_a_request(cases, reference):
     with pytest.raises(ApplicationError) as exc:
         BNG_ACTIVITIES["save_bng_offsite_allocation_step"](development, {"allocations": []})
     assert "at least one habitat bank" in _errors(exc)["allocations"]
+
+
+def test_case_report_for_development_and_bank(cases, reference):
+    from app.routers.bng import get_case_report
+
+    bank = _bank_with_uplift(cases, reference)
+    development = cases(BNG_DEVELOPMENT_WORKFLOW, status="completed")
+    BNG_ACTIVITIES["save_bng_baseline_habitats_step"](development, {"parcels": [_parcel(reference, "area", "5")]})
+
+    async def body(db):
+        return (
+            await get_case_report(development, db=db, access=None),
+            await get_case_report(bank, db=db, access=None),
+        )
+
+    dev_report, bank_report = _run(body)
+
+    assert dev_report["case_type"] == BNG_DEVELOPMENT_WORKFLOW
+    assert "roles" in dev_report and "monitoring" not in dev_report
+    assert "financials" in bank_report and "monitoring" in bank_report
