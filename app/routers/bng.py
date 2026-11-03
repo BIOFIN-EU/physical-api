@@ -40,7 +40,7 @@ from app.services.bng_monitoring import (
     verify_report,
 )
 from app.services.workflow_config_service import WorkflowConfigService
-from app.services.workflow_roles import bng_capacities, case_signoffs, user_roles
+from app.services.workflow_roles import bng_capacities, case_roles, case_signoffs, user_roles
 from app.services.bng_payload import (
     available_habitat_banks,
     bank_finances,
